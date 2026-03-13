@@ -15,15 +15,25 @@
   - 创建时间：2026-01-21（v1.0）
   - 更偏“基于 new-api 的 MrChat 研发计划与初版表结构/流程”。
 
-两份文档存在少量不一致（例如前端栈 Vue vs React、ID 方案等），后续用 ADR（架构决策记录）收敛。
+两份旧文档存在少量不一致（例如 ID 方案、MVP 边界、实时能力范围等）。当前建议以统一基线文档为主，再回看旧文档补背景。
 
-如果只想先对齐认知，建议先看：`docs/Current-Design-Summary.md`。
-MVP 上线范围见：`docs/MVP-v0.1-Scope.md`。
+如果只想先看当前统一口径，建议先看：`docs/Requirements-Baseline-v0.1.md`。
+如果只想快速对齐旧文档关系，可看：`docs/Current-Design-Summary.md`。
+MVP 上线范围草案见：`docs/MVP-v0.1-Scope.md`。
 
 已收敛的选型：
 
 - 前端框架：Vue 3 + Vite（见 `docs/adr/ADR-0001-frontend-framework-vue.md`）
-- Chat UI 策略：MVP 自研 simple Chat UI，不嵌入外部对话 UI（见 `docs/adr/ADR-0002-chat-ui-strategy-self-built.md`）
+- Chat UI 策略：核心 Chat 自研，外部子服务入口作为补充能力（见 `docs/adr/ADR-0002-chat-ui-strategy-self-built.md`）
+
+## 当前推荐阅读顺序
+
+1. `docs/Requirements-Baseline-v0.1.md`
+2. `docs/Page-and-Route-Spec-v0.1.md`
+3. `docs/API-Contract-v0.1.md`
+4. `docs/Data-Model-and-State-v0.1.md`
+5. `docs/Development-Task-Breakdown-v0.1.md`
+6. `docs/Current-Design-Summary.md`
 
 ## 调研产出（本目录）
 
