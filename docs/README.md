@@ -25,6 +25,8 @@ MVP 上线范围草案见：`docs/MVP-v0.1-Scope.md`。
 
 - 前端框架：Vue 3 + Vite（见 `docs/adr/ADR-0001-frontend-framework-vue.md`）
 - Chat UI 策略：核心 Chat 自研，外部子服务入口作为补充能力（见 `docs/adr/ADR-0002-chat-ui-strategy-self-built.md`）
+- 后端框架：Gin（见 `docs/adr/ADR-0003-backend-framework-gin.md`）
+- 主数据库：PostgreSQL（见 `docs/adr/ADR-0004-database-postgresql.md`）
 
 ## 当前推荐阅读顺序
 
