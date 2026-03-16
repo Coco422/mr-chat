@@ -50,6 +50,7 @@
 - 数据表迁移方案
 - goose 迁移目录、命名规范与执行方式
 - GORM 模型与仓储分层约定
+- Redis 使用边界与故障降级策略
 - 鉴权方案与 token 刷新方式
 - SSE 事件格式
 - `quota_logs` 的账本语义
@@ -64,6 +65,7 @@
 | `INF-03` | 建立 `.env` 与配置加载规范 | Fullstack | P0 | S | 无 | 本地、测试环境都能通过配置启动 |
 | `INF-04` | 准备本地依赖启动方式（PostgreSQL、Redis、可选 Mail mock） | Ops | P0 | S | 无 | 一条命令能起本地依赖 |
 | `INF-07` | 建立 goose 迁移目录、命名规范与本地/CI 执行命令 | Backend | P0 | S | `INF-01`、`INF-04` | 本地与 CI 都能用 goose 执行 `status` / `validate` / `up` |
+| `INF-08` | 约束 Redis 抽象层、key 命名空间、TTL 与降级策略 | Backend | P0 | M | `INF-01`、`INF-04` | Redis 用途边界明确，缓存/限流/冷却在 Redis 故障时都能自动降级而不阻塞核心链路 |
 | `INF-05` | 建立基础 CI（lint/test/build 占位） | Fullstack | P0 | M | `INF-01`、`INF-02` | PR 至少能跑通基础校验 |
 | `INF-06` | 统一日志、`request_id`、错误处理中间件 | Backend | P0 | M | `INF-01` | 所有请求都有 `request_id`，错误结构统一 |
 
@@ -77,7 +79,7 @@
 | `DB-04` | 建立 `redeem_codes`、`redeem_redemptions`、`audit_logs` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 兑换与审计表可在 PostgreSQL 上通过 goose 迁移 |
 | `AUTH-BE-01` | 实现注册、登录、退出、刷新 token | Backend | P0 | M | `DB-01` | 四个接口按契约工作 |
 | `AUTH-BE-02` | 实现 JWT/角色中间件与受保护路由守卫 | Backend | P0 | M | `AUTH-BE-01` | `User/Admin/Root` 权限可控 |
-| `AUTH-BE-03` | 实现登录失败次数限制、基础风控日志与限流 | Backend | P0 | M | `AUTH-BE-01`、`DB-04`、`INF-06` | 登录失败与限流可控，并有安全相关日志可查 |
+| `AUTH-BE-03` | 实现登录失败次数限制、基础风控日志与限流 | Backend | P0 | M | `AUTH-BE-01`、`DB-04`、`INF-06`、`INF-08` | 登录失败与限流可控，并在 Redis 不可用时降级为单实例内存策略与安全日志 |
 | `USER-BE-01` | 实现 `GET /users/me` 与 `PUT /users/me` | Backend | P0 | S | `AUTH-BE-01` | 用户资料可查看与更新 |
 | `USER-BE-02` | 实现 `GET /users/me/quota` 与 `GET /users/me/usage` 骨架 | Backend | P0 | M | `DB-03` | 返回真实或占位统计结构 |
 | `USER-BE-03` | 实现密码修改与安全信息接口 | Backend | P0 | S | `AUTH-BE-01`、`AUTH-BE-03` | 用户可修改密码，并可查看最近登录等安全信息 |
@@ -109,7 +111,7 @@
 | `CHAT-BE-01` | 实现会话 CRUD API | Backend | P0 | M | `DB-03`、`AUTH-BE-02` | 会话列表可按最近时间分页返回，并支持创建、重命名、软删 |
 | `CHAT-BE-02` | 实现消息列表 API | Backend | P0 | S | `DB-03`、`AUTH-BE-02` | 能分页返回消息 |
 | `CHAT-BE-03` | 实现 OpenAI 兼容上游客户端 | Backend | P0 | M | `ADMIN-BE-01` | 能调用一个上游完成非流式请求 |
-| `CHAT-BE-04` | 实现模型路由器、优先级 Failover 与上游冷却 | Backend | P0 | L | `CHAT-BE-03`、`ADMIN-BE-02` | 故障时自动切换下一个上游，并按服务商记录失败次数与冷却状态 |
+| `CHAT-BE-04` | 实现模型路由器、优先级 Failover 与上游冷却 | Backend | P0 | L | `CHAT-BE-03`、`ADMIN-BE-02`、`INF-08` | 故障时自动切换下一个上游，并按服务商记录失败次数与冷却状态；Redis 故障时退化为单实例内存冷却 |
 | `CHAT-BE-05` | 实现 Chat Completions 接口（SSE/非流式）与断连取消 | Backend | P0 | L | `CHAT-BE-03` | 同一入口支持流式/非流式，SSE 能稳定输出并响应 stop |
 | `CHAT-BE-06` | 实现消息持久化与状态流转 | Backend | P0 | M | `CHAT-BE-05`、`DB-03` | 消息状态可经历 `pending/streaming/completed/...` |
 | `CHAT-BE-07` | 实现 usage 采集与本地估算回退 | Backend | P0 | M | `CHAT-BE-05` | 上游无 usage 时仍可结算 |
@@ -150,8 +152,9 @@
 | `QA-02` | 验证上游故障 -> 自动切换 -> 恢复后回切 | Backend | P0 | M | `CHAT-BE-04` | 路由日志与行为一致 |
 | `QA-03` | 验证 stop/cancel 的结算与退款 | Fullstack | P0 | M | `CHAT-BE-05`、`BILL-BE-01` | 停止生成后余额与流水正确 |
 | `QA-04` | 权限与安全检查 | Fullstack | P0 | M | `AUTH-BE-02`、`ADMIN-*` | 普通用户无法访问后台与敏感操作 |
+| `QA-05` | 验证 Redis 故障降级 | Fullstack | P0 | M | `INF-08`、`AUTH-BE-03`、`CHAT-BE-04` | Redis 不可用时缓存旁路、限流/冷却退化为单实例策略，登录/Chat/结算/兑换链路不崩溃 |
 | `OBS-01` | 补基础观测：请求日志、路由日志、账本日志、审计日志 | Backend | P0 | S | `INF-06`、`CHAT-BE-08` | 线上排障所需日志齐备 |
-| `OPS-01` | 补部署与环境文档 | Ops | P0 | S | `INF-04` | 新环境能按文档部署 |
+| `OPS-01` | 补部署与环境文档 | Ops | P0 | S | `INF-04`、`INF-08` | 新环境能按文档部署，并包含 Redis 故障处理与降级说明 |
 | `DOC-01` | 回填实现结果到设计文档 | Fullstack | P0 | S | `M6` 完成前 | 文档与实现口径一致 |
 
 ## 11. M7：P1 任务池
@@ -173,12 +176,12 @@
 2. `INF-02` 前端工程骨架
 3. `INF-04` 本地 PostgreSQL / Redis 启动方式
 4. `INF-07` goose 迁移规范与执行命令
-5. `DB-01` 用户、认证与分组迁移
-6. `DB-02` 模型与上游迁移
-7. `AUTH-BE-01` 登录注册刷新
-8. `AUTH-BE-02` JWT 与角色守卫
-9. `AUTH-BE-03` 登录安全与风控日志
-10. `AUTH-FE-01` 登录注册页面
+5. `INF-08` Redis 使用边界与降级策略
+6. `DB-01` 用户、认证与分组迁移
+7. `DB-02` 模型与上游迁移
+8. `AUTH-BE-01` 登录注册刷新
+9. `AUTH-BE-02` JWT 与角色守卫
+10. `AUTH-BE-03` 登录安全与风控日志
 11. `ADMIN-BE-01` 上游 CRUD
 12. `ADMIN-BE-02` 模型、可见组与路由绑定
 
@@ -188,6 +191,7 @@
 
 - `INF-01` ~ `INF-06`
 - `INF-07`
+- `INF-08`
 - `DB-01` ~ `DB-04`
 - `AUTH-BE-01` ~ `AUTH-BE-03`
 - `USER-BE-01`
@@ -200,6 +204,7 @@
 - 能拿到当前用户
 - 登录安全基线到位
 - goose 迁移链路可用
+- Redis 故障降级策略到位
 - 工程能跑、表能迁移
 
 ### Sprint 2
@@ -241,7 +246,7 @@
 - `USAGE-FE-01`
 - `USAGE-FE-02`
 - `ADMIN-FE-06`
-- `QA-01` ~ `QA-04`
+- `QA-01` ~ `QA-05`
 
 目标：
 

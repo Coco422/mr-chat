@@ -29,6 +29,7 @@ MVP 上线范围草案见：`docs/MVP-v0.1-Scope.md`。
 - 默认 ORM：GORM（见 `docs/adr/ADR-0006-orm-gorm.md`）
 - 主数据库：PostgreSQL（见 `docs/adr/ADR-0004-database-postgresql.md`）
 - 数据库迁移工具：goose（见 `docs/adr/ADR-0005-migration-tool-goose.md`）
+- Redis 使用策略：仅作缓存/限流/共享短状态，并要求故障可降级（见 `docs/adr/ADR-0007-redis-runtime-strategy.md`）
 
 ## 当前推荐阅读顺序
 
