@@ -48,6 +48,8 @@
 ### 3.3 最值得先锁定的阻塞项
 
 - 数据表迁移方案
+- goose 迁移目录、命名规范与执行方式
+- GORM 模型与仓储分层约定
 - 鉴权方案与 token 刷新方式
 - SSE 事件格式
 - `quota_logs` 的账本语义
@@ -57,10 +59,11 @@
 
 | 任务 ID | 任务 | 端别 | 优先级 | 规模 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|---|
-| `INF-01` | 初始化后端工程骨架（Gin、配置、路由、控制器、服务、模型目录） | Backend | P0 | M | 无 | 能启动空服务并返回健康检查 |
+| `INF-01` | 初始化后端工程骨架（Gin、GORM、配置、路由、控制器、服务、模型目录） | Backend | P0 | M | 无 | 能启动空服务、初始化 GORM 数据访问层并返回健康检查 |
 | `INF-02` | 初始化前端工程骨架（Vue 3 + Vite + Router + 状态管理） | Frontend | P0 | M | 无 | 能启动前端并完成基础路由跳转 |
 | `INF-03` | 建立 `.env` 与配置加载规范 | Fullstack | P0 | S | 无 | 本地、测试环境都能通过配置启动 |
 | `INF-04` | 准备本地依赖启动方式（PostgreSQL、Redis、可选 Mail mock） | Ops | P0 | S | 无 | 一条命令能起本地依赖 |
+| `INF-07` | 建立 goose 迁移目录、命名规范与本地/CI 执行命令 | Backend | P0 | S | `INF-01`、`INF-04` | 本地与 CI 都能用 goose 执行 `status` / `validate` / `up` |
 | `INF-05` | 建立基础 CI（lint/test/build 占位） | Fullstack | P0 | M | `INF-01`、`INF-02` | PR 至少能跑通基础校验 |
 | `INF-06` | 统一日志、`request_id`、错误处理中间件 | Backend | P0 | M | `INF-01` | 所有请求都有 `request_id`，错误结构统一 |
 
@@ -68,10 +71,10 @@
 
 | 任务 ID | 任务 | 端别 | 优先级 | 规模 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|---|
-| `DB-01` | 建立 `users`、`auths`、`groups`、`group_members` 迁移 | Backend | P0 | M | `INF-01` | 可在 PostgreSQL 上成功迁移并回滚 |
-| `DB-02` | 建立 `upstreams`、`models`、`model_route_bindings` 迁移 | Backend | P0 | M | `INF-01` | 路由配置相关表可在 PostgreSQL 上迁移 |
-| `DB-03` | 建立 `conversations`、`messages`、`quota_logs` 迁移 | Backend | P0 | M | `INF-01` | 聊天与账本表可在 PostgreSQL 上迁移 |
-| `DB-04` | 建立 `redeem_codes`、`redeem_redemptions`、`audit_logs` 迁移 | Backend | P0 | M | `INF-01` | 兑换与审计表可在 PostgreSQL 上迁移 |
+| `DB-01` | 建立 `users`、`auths`、`groups`、`group_members` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 可在 PostgreSQL 上通过 goose 成功迁移并回滚 |
+| `DB-02` | 建立 `upstreams`、`models`、`model_route_bindings` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 路由配置相关表可在 PostgreSQL 上通过 goose 迁移 |
+| `DB-03` | 建立 `conversations`、`messages`、`quota_logs` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 聊天与账本表可在 PostgreSQL 上通过 goose 迁移 |
+| `DB-04` | 建立 `redeem_codes`、`redeem_redemptions`、`audit_logs` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 兑换与审计表可在 PostgreSQL 上通过 goose 迁移 |
 | `AUTH-BE-01` | 实现注册、登录、退出、刷新 token | Backend | P0 | M | `DB-01` | 四个接口按契约工作 |
 | `AUTH-BE-02` | 实现 JWT/角色中间件与受保护路由守卫 | Backend | P0 | M | `AUTH-BE-01` | `User/Admin/Root` 权限可控 |
 | `AUTH-BE-03` | 实现登录失败次数限制、基础风控日志与限流 | Backend | P0 | M | `AUTH-BE-01`、`DB-04`、`INF-06` | 登录失败与限流可控，并有安全相关日志可查 |
@@ -166,16 +169,16 @@
 
 如果要先起一批 issue，建议优先创建这 12 个：
 
-1. `INF-01` 后端工程骨架（Gin）
+1. `INF-01` 后端工程骨架（Gin + GORM）
 2. `INF-02` 前端工程骨架
 3. `INF-04` 本地 PostgreSQL / Redis 启动方式
-4. `DB-01` 用户、认证与分组迁移
-5. `DB-02` 模型与上游迁移
-6. `AUTH-BE-01` 登录注册刷新
-7. `AUTH-BE-02` JWT 与角色守卫
-8. `AUTH-BE-03` 登录安全与风控日志
-9. `AUTH-FE-01` 登录注册页面
-10. `GROUP-BE-01` 用户组与成员维护 API
+4. `INF-07` goose 迁移规范与执行命令
+5. `DB-01` 用户、认证与分组迁移
+6. `DB-02` 模型与上游迁移
+7. `AUTH-BE-01` 登录注册刷新
+8. `AUTH-BE-02` JWT 与角色守卫
+9. `AUTH-BE-03` 登录安全与风控日志
+10. `AUTH-FE-01` 登录注册页面
 11. `ADMIN-BE-01` 上游 CRUD
 12. `ADMIN-BE-02` 模型、可见组与路由绑定
 
@@ -184,6 +187,7 @@
 ### Sprint 1
 
 - `INF-01` ~ `INF-06`
+- `INF-07`
 - `DB-01` ~ `DB-04`
 - `AUTH-BE-01` ~ `AUTH-BE-03`
 - `USER-BE-01`
@@ -195,6 +199,7 @@
 - 能登录
 - 能拿到当前用户
 - 登录安全基线到位
+- goose 迁移链路可用
 - 工程能跑、表能迁移
 
 ### Sprint 2
