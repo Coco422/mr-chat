@@ -13,8 +13,12 @@ import (
 	"mrchat/internal/app/server"
 	"mrchat/internal/http/router"
 	"mrchat/internal/modules/account"
+	"mrchat/internal/modules/admin"
+	"mrchat/internal/modules/audit"
 	authmodule "mrchat/internal/modules/auth"
 	"mrchat/internal/modules/billing"
+	"mrchat/internal/modules/catalog"
+	"mrchat/internal/modules/chat"
 	"mrchat/internal/modules/health"
 	"mrchat/internal/modules/users"
 	"mrchat/internal/platform/cache"
@@ -54,17 +58,36 @@ func main() {
 	defer redisClient.Close()
 
 	accountRepository := account.NewRepository(dbClient.DB)
+	auditRepository := audit.NewRepository(dbClient.DB)
+	catalogRepository := catalog.NewRepository(dbClient.DB)
 	tokenManager := authmodule.NewTokenManager(cfg.Auth)
 	authService := authmodule.NewService(accountRepository, tokenManager)
 	userService := users.NewService(accountRepository)
 	billingService := billing.NewService(accountRepository)
+	catalogService := catalog.NewService(catalogRepository, accountRepository)
+	chatService := chat.NewService(chat.NewRepository(dbClient.DB))
+	adminService := admin.NewService(accountRepository, catalogRepository, auditRepository)
 
 	healthHandler := health.NewHandler(cfg, dbClient, redisClient)
 	authHandler := authmodule.NewHandler(cfg.Auth, authService)
 	userHandler := users.NewHandler(userService)
 	billingHandler := billing.NewHandler(billingService)
+	catalogHandler := catalog.NewHandler(catalogService)
+	chatHandler := chat.NewHandler(chatService)
+	adminHandler := admin.NewHandler(adminService)
 
-	engine := router.New(cfg, log, healthHandler, authHandler, userHandler, billingHandler, tokenManager)
+	engine := router.New(
+		cfg,
+		log,
+		healthHandler,
+		authHandler,
+		userHandler,
+		billingHandler,
+		catalogHandler,
+		chatHandler,
+		adminHandler,
+		tokenManager,
+	)
 
 	httpServer := server.New(cfg.HTTP, engine)
 

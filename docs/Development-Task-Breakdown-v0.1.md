@@ -1,12 +1,40 @@
 # MrChat v0.1 开发任务拆解清单
 
-- 状态：执行清单草案
+- 状态：执行中
 - 日期：2026-03-17
 - 依赖文档：
   - `docs/Requirements-Baseline-v0.1.md`
   - `docs/Page-and-Route-Spec-v0.1.md`
   - `docs/API-Contract-v0.1.md`
   - `docs/Data-Model-and-State-v0.1.md`
+  - `docs/Implementation-Progress.md`
+
+## 0. 当前实现快照
+
+截至 `2026-03-17`，当前任务推进情况可简化理解为：
+
+- 已落地：
+  - `INF-01`、`INF-02`、`INF-03`、`INF-04`、`INF-06`、`INF-07`
+  - `DB-01` ~ `DB-04`
+  - `AUTH-BE-01`、`AUTH-BE-02`
+  - `USER-BE-01`、`USER-BE-02`、`USER-BE-03`
+  - `AUTH-FE-01`、`APP-FE-01`、`USER-FE-01`、`USER-FE-02`
+  - `ADMIN-BE-03`、`ADMIN-BE-04`
+  - `MODEL-BE-01`
+  - `CHAT-BE-01`、`CHAT-BE-02`
+- 已进入开发但未完全完成：
+  - `INF-08`
+  - `AUTH-BE-03`
+  - `ADMIN-BE-01`
+  - `ADMIN-BE-02`
+  - `GROUP-BE-01`
+  - `CHAT-BE-03` ~ `CHAT-BE-08`
+
+当前已经可以稳定支撑：
+
+- 注册 / 登录 / 当前用户 / 个人设置 / 安全设置 / 用量页联调
+- Admin 上游 / 模型 / 用户调额 / 审计日志联调
+- Chat 侧模型列表、会话 CRUD、消息列表联调
 
 ## 1. 使用方式
 

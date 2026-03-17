@@ -4,10 +4,10 @@ MrChat is a Go + Vue based multi-model chat platform currently entering the firs
 
 ## Current Focus
 
-- `M0` / `M1` engineering bootstrap
-- backend skeleton with Gin + GORM + PostgreSQL
-- frontend skeleton with Vue 3 + Vite
-- local development workflow with PostgreSQL + Redis
+- `M0` / `M1` already usable for local development and integration
+- `M2` admin APIs are partially implemented and can be smoke-tested
+- `M3` chat APIs currently cover model list, conversation CRUD, and message reads
+- frontend remains intentionally unstyled and only preserves integration logic
 
 ## Repository Layout
 

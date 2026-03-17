@@ -1,15 +1,213 @@
 <template>
-  <section class="panel stack">
-    <div>
-      <h1>Models</h1>
-      <p class="muted">后续接入 `ADMIN-BE-02`，维护模型、可见组和路由优先级。</p>
-    </div>
+  <section>
+    <h1>Models</h1>
+    <p v-if="errorMessage">{{ errorMessage }}</p>
 
-    <ul class="placeholder-list">
-      <li>model key / display name / pricing</li>
-      <li>allowed groups</li>
-      <li>route bindings priority list</li>
+    <form @submit.prevent="createModel">
+      <div>
+        <label>
+          Model Key
+          <input v-model.trim="form.modelKey" type="text" required />
+        </label>
+      </div>
+      <div>
+        <label>
+          Display Name
+          <input v-model.trim="form.displayName" type="text" required />
+        </label>
+      </div>
+      <div>
+        <label>
+          Provider Type
+          <input v-model.trim="form.providerType" type="text" />
+        </label>
+      </div>
+      <div>
+        <label>
+          Context Length
+          <input v-model.number="form.contextLength" type="number" min="1" />
+        </label>
+      </div>
+      <div>
+        <label>
+          Max Output Tokens
+          <input v-model.number="form.maxOutputTokens" type="number" min="1" />
+        </label>
+      </div>
+      <div>
+        <label>
+          Allowed Group IDs
+          <input v-model.trim="form.allowedGroupIDsRaw" type="text" placeholder="uuid1,uuid2" />
+        </label>
+      </div>
+      <div>
+        <label>
+          Upstream
+          <select v-model="form.upstreamID">
+            <option value="">请选择</option>
+            <option v-for="upstream in upstreams" :key="upstream.id" :value="upstream.id">
+              {{ upstream.name }}
+            </option>
+          </select>
+        </label>
+      </div>
+      <div>
+        <label>
+          状态
+          <select v-model="form.status">
+            <option value="active">active</option>
+            <option value="disabled">disabled</option>
+          </select>
+        </label>
+      </div>
+      <button type="submit" :disabled="submitting">创建模型</button>
+      <button type="button" @click="loadData" :disabled="loading">刷新</button>
+    </form>
+
+    <hr />
+
+    <p v-if="loading">加载中...</p>
+    <ul v-else-if="items.length > 0">
+      <li v-for="item in items" :key="item.id">
+        {{ item.display_name }} / {{ item.model_key }} / {{ item.status }}
+        <div>
+          bindings:
+          <span v-for="binding in item.route_bindings" :key="binding.id">
+            {{ binding.upstream_id }}#{{ binding.priority }}
+          </span>
+        </div>
+      </li>
     </ul>
+    <p v-else>暂无模型</p>
   </section>
 </template>
 
+<script setup lang="ts">
+import { onMounted, reactive, ref } from 'vue'
+
+import { ApiError, apiRequest } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
+
+interface UpstreamItem {
+  id: string
+  name: string
+}
+
+interface ModelItem {
+  id: string
+  model_key: string
+  display_name: string
+  status: string
+  route_bindings: Array<{
+    id: string
+    upstream_id: string
+    priority: number
+  }>
+}
+
+const auth = useAuthStore()
+const loading = ref(false)
+const submitting = ref(false)
+const errorMessage = ref('')
+const upstreams = ref<UpstreamItem[]>([])
+const items = ref<ModelItem[]>([])
+const form = reactive({
+  modelKey: '',
+  displayName: '',
+  providerType: 'openai_compatible',
+  contextLength: 32000,
+  maxOutputTokens: 4096,
+  allowedGroupIDsRaw: '',
+  upstreamID: '',
+  status: 'active'
+})
+
+onMounted(async () => {
+  await loadData()
+})
+
+async function loadData() {
+  loading.value = true
+  errorMessage.value = ''
+
+  try {
+    const [modelsResponse, upstreamsResponse] = await Promise.all([
+      apiRequest<ModelItem[]>('/admin/models', {
+        accessToken: auth.accessToken
+      }),
+      apiRequest<UpstreamItem[]>('/admin/upstreams', {
+        accessToken: auth.accessToken
+      })
+    ])
+
+    items.value = modelsResponse.data
+    upstreams.value = upstreamsResponse.data
+
+    if (!form.upstreamID && upstreams.value.length > 0) {
+      form.upstreamID = upstreams.value[0].id
+    }
+  } catch (error) {
+    errorMessage.value = toErrorMessage(error)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function createModel() {
+  submitting.value = true
+  errorMessage.value = ''
+
+  try {
+    await apiRequest('/admin/models', {
+      method: 'POST',
+      accessToken: auth.accessToken,
+      body: {
+        model_key: form.modelKey,
+        display_name: form.displayName,
+        provider_type: form.providerType,
+        context_length: form.contextLength,
+        max_output_tokens: form.maxOutputTokens,
+        pricing: {},
+        capabilities: {
+          chat: true
+        },
+        allowed_group_ids: parseCSV(form.allowedGroupIDsRaw),
+        status: form.status,
+        metadata: {},
+        route_bindings: form.upstreamID
+          ? [
+              {
+                upstream_id: form.upstreamID,
+                priority: 1,
+                status: 'active'
+              }
+            ]
+          : []
+      }
+    })
+
+    form.modelKey = ''
+    form.displayName = ''
+    form.allowedGroupIDsRaw = ''
+    await loadData()
+  } catch (error) {
+    errorMessage.value = toErrorMessage(error)
+  } finally {
+    submitting.value = false
+  }
+}
+
+function parseCSV(value: string) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function toErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    return `${error.code}: ${error.message}`
+  }
+  return '请求失败'
+}
+</script>

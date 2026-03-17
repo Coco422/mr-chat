@@ -96,3 +96,8 @@ VITE_API_BASE_URL=http://127.0.0.1:8080
 - `/settings/profile` <-> `GET/PUT /api/v1/users/me`
 - `/settings/security` <-> `GET /api/v1/users/me/security`、`PUT /api/v1/users/me/password`
 - `/usage` <-> `GET /api/v1/users/me/quota`、`GET /api/v1/users/me/usage`、`GET /api/v1/billing/summary`、`GET /api/v1/billing/logs`
+- `/chat`、`/chat/:conversationId` <-> `GET /api/v1/models`、`GET/POST/PUT/DELETE /api/v1/conversations`、`GET /api/v1/conversations/:id/messages`
+- `/admin/upstreams` <-> `GET/POST/PUT /api/v1/admin/upstreams`
+- `/admin/models` <-> `GET/POST/PUT /api/v1/admin/models`
+- `/admin/users` <-> `GET /api/v1/admin/users`、`PUT /api/v1/admin/users/:id/quota`
+- `/admin/audit-logs` <-> `GET /api/v1/admin/audit-logs`

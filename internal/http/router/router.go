@@ -8,8 +8,12 @@ import (
 
 	"mrchat/internal/app/config"
 	"mrchat/internal/http/middleware"
+	"mrchat/internal/modules/account"
+	"mrchat/internal/modules/admin"
 	authmodule "mrchat/internal/modules/auth"
 	"mrchat/internal/modules/billing"
+	"mrchat/internal/modules/catalog"
+	"mrchat/internal/modules/chat"
 	"mrchat/internal/modules/health"
 	"mrchat/internal/modules/users"
 	"mrchat/internal/shared/httpx"
@@ -22,6 +26,9 @@ func New(
 	authHandler *authmodule.Handler,
 	userHandler *users.Handler,
 	billingHandler *billing.Handler,
+	catalogHandler *catalog.Handler,
+	chatHandler *chat.Handler,
+	adminHandler *admin.Handler,
 	tokenManager *authmodule.TokenManager,
 ) *gin.Engine {
 	setMode(cfg.App.Environment)
@@ -51,6 +58,13 @@ func New(
 		authorized := api.Group("")
 		authorized.Use(middleware.RequireAuth(tokenManager))
 		{
+			authorized.GET("/models", catalogHandler.ListVisibleModels)
+			authorized.GET("/conversations", chatHandler.ListConversations)
+			authorized.POST("/conversations", chatHandler.CreateConversation)
+			authorized.PUT("/conversations/:id", chatHandler.UpdateConversation)
+			authorized.DELETE("/conversations/:id", chatHandler.DeleteConversation)
+			authorized.GET("/conversations/:id/messages", chatHandler.ListMessages)
+
 			authorized.GET("/users/me", userHandler.GetMe)
 			authorized.PUT("/users/me", userHandler.UpdateMe)
 			authorized.GET("/users/me/quota", userHandler.GetQuota)
@@ -60,6 +74,26 @@ func New(
 
 			authorized.GET("/billing/summary", billingHandler.GetSummary)
 			authorized.GET("/billing/logs", billingHandler.ListLogs)
+		}
+
+		adminGroup := api.Group("/admin")
+		adminGroup.Use(
+			middleware.RequireAuth(tokenManager),
+			middleware.RequireRoles(account.RoleAdmin, account.RoleRoot),
+		)
+		{
+			adminGroup.GET("/upstreams", adminHandler.ListUpstreams)
+			adminGroup.POST("/upstreams", adminHandler.CreateUpstream)
+			adminGroup.PUT("/upstreams/:id", adminHandler.UpdateUpstream)
+
+			adminGroup.GET("/models", adminHandler.ListModels)
+			adminGroup.POST("/models", adminHandler.CreateModel)
+			adminGroup.PUT("/models/:id", adminHandler.UpdateModel)
+
+			adminGroup.GET("/users", adminHandler.ListUsers)
+			adminGroup.PUT("/users/:id/quota", adminHandler.AdjustUserQuota)
+
+			adminGroup.GET("/audit-logs", adminHandler.ListAuditLogs)
 		}
 	}
 
