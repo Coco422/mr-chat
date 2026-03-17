@@ -184,9 +184,13 @@
 {
   "success": true,
   "data": {
+    "access_token": "jwt",
+    "expires_in": 3600,
     "user": {
       "id": "uuid",
-      "username": "ray"
+      "username": "ray",
+      "email": "ray@example.com",
+      "role": "user"
     }
   },
   "request_id": "req_123"
@@ -215,6 +219,7 @@
     "user": {
       "id": "uuid",
       "username": "ray",
+      "email": "ray@example.com",
       "role": "user"
     }
   },
@@ -236,7 +241,13 @@
   "success": true,
   "data": {
     "access_token": "new_jwt",
-    "expires_in": 3600
+    "expires_in": 3600,
+    "user": {
+      "id": "uuid",
+      "username": "ray",
+      "email": "ray@example.com",
+      "role": "user"
+    }
   },
   "request_id": "req_123"
 }
@@ -263,7 +274,34 @@
 }
 ```
 
-## 5.3 `GET /api/v1/users/me/quota`
+## 5.3 `GET /api/v1/users/me/security`
+
+响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "last_login_at": "2026-03-12T09:00:00Z",
+    "password_updated_at": "2026-03-12T09:00:00Z",
+    "has_password": true
+  },
+  "request_id": "req_123"
+}
+```
+
+## 5.4 `PUT /api/v1/users/me/password`
+
+请求：
+
+```json
+{
+  "current_password": "secret-old",
+  "new_password": "secret-new"
+}
+```
+
+## 5.5 `GET /api/v1/users/me/quota`
 
 响应：
 
@@ -273,13 +311,18 @@
   "data": {
     "quota": 1200000,
     "used_quota": 450000,
-    "remaining_quota": 750000
+    "remaining_quota": 1200000
   },
   "request_id": "req_123"
 }
 ```
 
-## 5.4 `GET /api/v1/users/me/usage`
+说明：
+
+- `quota` 表示当前余额
+- `remaining_quota` 在 v0.1 作为余额别名返回，便于前端语义对齐
+
+## 5.6 `GET /api/v1/users/me/usage`
 
 查询参数：
 
@@ -753,4 +796,3 @@ data: [DONE]
 - `ADMIN_RESOURCE_NOT_FOUND`
 - `ADMIN_INVALID_STATUS_TRANSITION`
 - `ADMIN_SENSITIVE_OPERATION_REQUIRES_AUDIT`
-

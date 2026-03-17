@@ -159,6 +159,11 @@
 
 - `POST /api/v1/auth/signup`
 
+成功后动作：
+
+- 后端直接返回 `access_token` 并设置 `refresh_token` Cookie
+- 前端拉取当前用户后跳转到 `/chat`
+
 ## 5.3 `/chat`
 
 目标：
@@ -216,7 +221,7 @@
 - `GET /api/v1/users/me/usage`
 - `GET /api/v1/billing/logs`
 - `GET /api/v1/billing/summary`
-- `POST /api/v1/billing/redeem`
+- `POST /api/v1/billing/redeem`（M5，可按功能开关隐藏）
 
 ## 5.5 `/settings/profile`
 
@@ -251,7 +256,8 @@
 
 依赖接口：
 
-- v0.1 可先复用 `PUT /api/v1/users/me` 或单独增加密码修改接口
+- `GET /api/v1/users/me/security`
+- `PUT /api/v1/users/me/password`
 
 ## 5.7 `/services`（P1）
 
@@ -435,6 +441,7 @@
 | `/chat/:conversationId` | `GET /users/me`、`GET /models`、`GET /conversations`、`GET /conversations/:id/messages` |
 | `/usage` | `GET /users/me/quota`、`GET /users/me/usage`、`GET /billing/summary`、`GET /billing/logs` |
 | `/settings/profile` | `GET /users/me` |
+| `/settings/security` | `GET /users/me/security` |
 | `/services` | `GET /service-entries` |
 | `/admin/upstreams` | `GET /admin/upstreams` |
 | `/admin/models` | `GET /admin/models` |
@@ -465,4 +472,3 @@
 - `/services`
 - `/services/:serviceEntryId`
 - `/admin/service-entries`
-

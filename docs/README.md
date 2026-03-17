@@ -39,6 +39,7 @@ MVP 上线范围草案见：`docs/MVP-v0.1-Scope.md`。
 4. `docs/Data-Model-and-State-v0.1.md`
 5. `docs/Development-Task-Breakdown-v0.1.md`
 6. `docs/Current-Design-Summary.md`
+7. `docs/Local-Development.md`
 
 ## 调研产出（本目录）
 
