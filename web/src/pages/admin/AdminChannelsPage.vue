@@ -71,7 +71,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { createAdminChannel, listAdminChannels } from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
 interface ChannelItem {
@@ -103,10 +104,7 @@ async function loadChannels() {
   errorMessage.value = ''
 
   try {
-    const { data } = await apiRequest<ChannelItem[]>('/admin/channels', {
-      accessToken: auth.accessToken
-    })
-    items.value = data
+    items.value = await listAdminChannels<ChannelItem[]>(auth.accessToken)
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {
@@ -119,16 +117,12 @@ async function createChannel() {
   errorMessage.value = ''
 
   try {
-    await apiRequest('/admin/channels', {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: {
-        name: form.name,
-        description: form.description || null,
-        status: form.status,
-        billing_config: parseJSON(form.billingConfigText),
-        metadata: {}
-      }
+    await createAdminChannel(auth.accessToken, {
+      name: form.name,
+      description: form.description || null,
+      status: form.status,
+      billing_config: parseJSON(form.billingConfigText),
+      metadata: {}
     })
 
     form.name = ''

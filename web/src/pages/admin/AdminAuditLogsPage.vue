@@ -63,7 +63,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { listAdminAuditLogs } from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
 interface AuditLogItem {
@@ -109,10 +110,7 @@ async function loadLogs() {
       params.set('result', filters.result)
     }
 
-    const { data } = await apiRequest<AuditLogItem[]>(`/admin/audit-logs?${params.toString()}`, {
-      accessToken: auth.accessToken
-    })
-    items.value = data
+    items.value = await listAdminAuditLogs<AuditLogItem[]>(auth.accessToken, params.toString())
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {

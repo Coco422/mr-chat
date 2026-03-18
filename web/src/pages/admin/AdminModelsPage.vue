@@ -112,7 +112,14 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import {
+  createAdminModel,
+  listAdminChannels,
+  listAdminModels,
+  listAdminUpstreams,
+  listAdminUserGroups
+} from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
 interface UpstreamItem {
@@ -175,24 +182,16 @@ async function loadData() {
 
   try {
     const [modelsResponse, upstreamsResponse, channelsResponse, userGroupsResponse] = await Promise.all([
-      apiRequest<ModelItem[]>('/admin/models', {
-        accessToken: auth.accessToken
-      }),
-      apiRequest<UpstreamItem[]>('/admin/upstreams', {
-        accessToken: auth.accessToken
-      }),
-      apiRequest<ChannelItem[]>('/admin/channels', {
-        accessToken: auth.accessToken
-      }),
-      apiRequest<UserGroupItem[]>('/admin/user-groups', {
-        accessToken: auth.accessToken
-      })
+      listAdminModels<ModelItem[]>(auth.accessToken),
+      listAdminUpstreams<UpstreamItem[]>(auth.accessToken),
+      listAdminChannels<ChannelItem[]>(auth.accessToken),
+      listAdminUserGroups<UserGroupItem[]>(auth.accessToken)
     ])
 
-    items.value = modelsResponse.data
-    upstreams.value = upstreamsResponse.data
-    channels.value = channelsResponse.data
-    userGroups.value = userGroupsResponse.data
+    items.value = modelsResponse
+    upstreams.value = upstreamsResponse
+    channels.value = channelsResponse
+    userGroups.value = userGroupsResponse
 
     if (!form.upstreamID && upstreams.value.length > 0) {
       form.upstreamID = upstreams.value[0].id
@@ -209,33 +208,29 @@ async function createModel() {
   errorMessage.value = ''
 
   try {
-    await apiRequest('/admin/models', {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: {
-        model_key: form.modelKey,
-        display_name: form.displayName,
-        provider_type: form.providerType,
-        context_length: form.contextLength,
-        max_output_tokens: form.maxOutputTokens,
-        pricing: {},
-        capabilities: {
-          chat: true
-        },
-        visible_user_group_ids: parseCSV(form.visibleUserGroupIDsRaw),
-        status: form.status,
-        metadata: {},
-        route_bindings: form.upstreamID
-          ? [
-              {
-                channel_id: form.channelID || null,
-                upstream_id: form.upstreamID,
-                priority: 1,
-                status: 'active'
-              }
-            ]
-          : []
-      }
+    await createAdminModel(auth.accessToken, {
+      model_key: form.modelKey,
+      display_name: form.displayName,
+      provider_type: form.providerType,
+      context_length: form.contextLength,
+      max_output_tokens: form.maxOutputTokens,
+      pricing: {},
+      capabilities: {
+        chat: true
+      },
+      visible_user_group_ids: parseCSV(form.visibleUserGroupIDsRaw),
+      status: form.status,
+      metadata: {},
+      route_bindings: form.upstreamID
+        ? [
+            {
+              channel_id: form.channelID || null,
+              upstream_id: form.upstreamID,
+              priority: 1,
+              status: 'active'
+            }
+          ]
+        : []
     })
 
     form.modelKey = ''

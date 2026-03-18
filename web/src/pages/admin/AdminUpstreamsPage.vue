@@ -99,7 +99,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { createAdminUpstream, listAdminUpstreams } from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
 interface UpstreamItem {
@@ -137,10 +138,7 @@ async function loadUpstreams() {
   errorMessage.value = ''
 
   try {
-    const { data } = await apiRequest<UpstreamItem[]>('/admin/upstreams', {
-      accessToken: auth.accessToken
-    })
-    items.value = data
+    items.value = await listAdminUpstreams<UpstreamItem[]>(auth.accessToken)
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {
@@ -153,21 +151,17 @@ async function createUpstream() {
   errorMessage.value = ''
 
   try {
-    await apiRequest('/admin/upstreams', {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: {
-        name: form.name,
-        provider_type: form.providerType,
-        base_url: form.baseURL,
-        auth_type: form.authType,
-        auth_config: form.apiKey ? { api_key: form.apiKey } : {},
-        status: form.status,
-        timeout_seconds: form.timeoutSeconds,
-        cooldown_seconds: form.cooldownSeconds,
-        failure_threshold: form.failureThreshold,
-        metadata: {}
-      }
+    await createAdminUpstream(auth.accessToken, {
+      name: form.name,
+      provider_type: form.providerType,
+      base_url: form.baseURL,
+      auth_type: form.authType,
+      auth_config: form.apiKey ? { api_key: form.apiKey } : {},
+      status: form.status,
+      timeout_seconds: form.timeoutSeconds,
+      cooldown_seconds: form.cooldownSeconds,
+      failure_threshold: form.failureThreshold,
+      metadata: {}
     })
 
     form.name = ''

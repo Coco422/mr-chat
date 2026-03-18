@@ -91,20 +91,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { signUp } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
-
-interface AuthSessionResponse {
-  access_token: string
-  expires_in: number
-  user: {
-    id: string
-    username: string
-    email: string
-    role: 'user' | 'admin' | 'root'
-  }
-}
 
 const { toggleTheme, isDark } = useTheme()
 const username = ref('')
@@ -124,9 +114,10 @@ async function submit() {
   errorMessage.value = ''
 
   try {
-    const { data } = await apiRequest<AuthSessionResponse>('/auth/signup', {
-      method: 'POST',
-      body: { username: username.value, email: email.value, password: password.value }
+    const data = await signUp({
+      username: username.value,
+      email: email.value,
+      password: password.value
     })
 
     auth.setSession(data.access_token, data.user)

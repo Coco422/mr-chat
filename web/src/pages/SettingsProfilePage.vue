@@ -35,7 +35,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { getCurrentUser, updateCurrentUser } from '@/api/user'
 import { useAuthStore, type CurrentUser } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -56,9 +57,7 @@ async function loadProfile() {
   }
 
   try {
-    const { data } = await apiRequest<CurrentUser>('/users/me', {
-      accessToken: auth.accessToken
-    })
+    const data = await getCurrentUser<CurrentUser>(auth.accessToken)
     auth.setSession(auth.accessToken, data)
     displayName.value = data.display_name
     avatarUrl.value = data.avatar_url ?? ''
@@ -78,16 +77,12 @@ async function save() {
   message.value = ''
 
   try {
-    const { data } = await apiRequest<CurrentUser>('/users/me', {
-      method: 'PUT',
-      accessToken: auth.accessToken,
-      body: {
-        display_name: displayName.value,
-        avatar_url: avatarUrl.value,
-        settings: {
-          timezone: timezone.value,
-          locale: locale.value
-        }
+    const data = await updateCurrentUser<CurrentUser>(auth.accessToken, {
+      display_name: displayName.value,
+      avatar_url: avatarUrl.value,
+      settings: {
+        timezone: timezone.value,
+        locale: locale.value
       }
     })
 

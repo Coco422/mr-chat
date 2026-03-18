@@ -151,7 +151,17 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import {
+  createAdminUserLimitAdjustment,
+  getAdminUserLimitUsage,
+  listAdminModels,
+  listAdminUserGroups,
+  listAdminUserLimitAdjustments,
+  listAdminUsers,
+  updateAdminUserGroup,
+  updateAdminUserQuota
+} from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
 interface AdminUser {
@@ -249,16 +259,12 @@ async function reloadAll() {
 async function loadReferenceData() {
   try {
     const [groupResponse, modelResponse] = await Promise.all([
-      apiRequest<UserGroupItem[]>('/admin/user-groups', {
-        accessToken: auth.accessToken
-      }),
-      apiRequest<ModelItem[]>('/admin/models', {
-        accessToken: auth.accessToken
-      })
+      listAdminUserGroups<UserGroupItem[]>(auth.accessToken),
+      listAdminModels<ModelItem[]>(auth.accessToken)
     ])
 
-    groups.value = groupResponse.data
-    models.value = modelResponse.data
+    groups.value = groupResponse
+    models.value = modelResponse
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   }
@@ -280,9 +286,7 @@ async function loadUsers() {
       params.set('status', filters.status)
     }
 
-    const { data } = await apiRequest<AdminUser[]>(`/admin/users?${params.toString()}`, {
-      accessToken: auth.accessToken
-    })
+    const data = await listAdminUsers<AdminUser[]>(auth.accessToken, params.toString())
     items.value = data
     for (const item of data) {
       selectedGroupByUser[item.id] = item.user_group_id ?? ''
@@ -305,13 +309,7 @@ async function assignUserGroup(userID: string) {
   errorMessage.value = ''
 
   try {
-    await apiRequest(`/admin/users/${userID}/group`, {
-      method: 'PUT',
-      accessToken: auth.accessToken,
-      body: {
-        user_group_id: selectedGroupByUser[userID] || null
-      }
-    })
+    await updateAdminUserGroup(auth.accessToken, userID, selectedGroupByUser[userID] || null)
 
     await loadUsers()
   } catch (error) {
@@ -326,14 +324,12 @@ async function adjustQuota(userID: string) {
   errorMessage.value = ''
 
   try {
-    await apiRequest(`/admin/users/${userID}/quota`, {
-      method: 'PUT',
-      accessToken: auth.accessToken,
-      body: {
-        delta: Number(quotaDelta[userID] || 0),
-        reason: quotaReason[userID] || ''
-      }
-    })
+    await updateAdminUserQuota(
+      auth.accessToken,
+      userID,
+      Number(quotaDelta[userID] || 0),
+      quotaReason[userID] || ''
+    )
 
     quotaDelta[userID] = ''
     quotaReason[userID] = ''
@@ -350,16 +346,11 @@ async function loadLimitUsage(userID: string) {
   errorMessage.value = ''
 
   try {
-    const params = new URLSearchParams()
-    if (usageModelByUser[userID]) {
-      params.set('model_id', usageModelByUser[userID])
-    }
-
-    const suffix = params.size > 0 ? `?${params.toString()}` : ''
-    const { data } = await apiRequest<UsageReport>(`/admin/users/${userID}/limit-usage${suffix}`, {
-      accessToken: auth.accessToken
-    })
-    usageReports[userID] = data
+    usageReports[userID] = await getAdminUserLimitUsage<UsageReport>(
+      auth.accessToken,
+      userID,
+      usageModelByUser[userID] || undefined
+    )
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {
@@ -380,10 +371,11 @@ async function loadAdjustments(userID: string) {
       params.set('model_id', usageModelByUser[userID])
     }
 
-    const { data } = await apiRequest<UserLimitAdjustment[]>(`/admin/users/${userID}/limit-adjustments?${params.toString()}`, {
-      accessToken: auth.accessToken
-    })
-    adjustmentsByUser[userID] = data
+    adjustmentsByUser[userID] = await listAdminUserLimitAdjustments<UserLimitAdjustment[]>(
+      auth.accessToken,
+      userID,
+      params.toString()
+    )
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {
@@ -396,16 +388,12 @@ async function createAdjustment(userID: string) {
   errorMessage.value = ''
 
   try {
-    await apiRequest(`/admin/users/${userID}/limit-adjustments`, {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: {
-        model_id: adjustmentModelByUser[userID] || null,
-        metric_type: adjustmentMetricByUser[userID] || 'request_count',
-        window_type: adjustmentWindowByUser[userID] || 'rolling_hour',
-        delta: Number(adjustmentDeltaByUser[userID] || 0),
-        reason: adjustmentReasonByUser[userID] || null
-      }
+    await createAdminUserLimitAdjustment(auth.accessToken, userID, {
+      model_id: adjustmentModelByUser[userID] || null,
+      metric_type: adjustmentMetricByUser[userID] || 'request_count',
+      window_type: adjustmentWindowByUser[userID] || 'rolling_hour',
+      delta: Number(adjustmentDeltaByUser[userID] || 0),
+      reason: adjustmentReasonByUser[userID] || null
     })
 
     adjustmentDeltaByUser[userID] = ''

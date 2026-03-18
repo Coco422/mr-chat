@@ -94,15 +94,7 @@ import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
-import { apiRequest } from '@/lib/api'
-
-interface ConversationSummary {
-  id: string
-  title: string
-  model_id: string | null
-  message_count: number
-  status: string
-}
+import { createConversation as createConversationRequest, listConversations, type ConversationSummary } from '@/api/chat'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -128,10 +120,7 @@ onUnmounted(() => {
 
 async function loadConversations() {
   try {
-    const { data } = await apiRequest<ConversationSummary[]>('/conversations', {
-      accessToken: auth.accessToken
-    })
-    conversations.value = data
+    conversations.value = await listConversations(auth.accessToken)
   } catch (error) {
     console.error('Failed to load conversations:', error)
   }
@@ -139,10 +128,9 @@ async function loadConversations() {
 
 async function createConversation() {
   try {
-    const { data } = await apiRequest<ConversationSummary>('/conversations', {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: { title: '新对话', model_id: null }
+    const data = await createConversationRequest(auth.accessToken, {
+      title: '新对话',
+      model_id: null
     })
     await loadConversations()
     router.push(`/chat/${data.id}`)

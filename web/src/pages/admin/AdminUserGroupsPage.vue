@@ -131,7 +131,14 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import {
+  createAdminUserGroup,
+  getAdminUserGroupLimits,
+  listAdminModels,
+  listAdminUserGroups,
+  updateAdminUserGroupLimits
+} from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
 interface UserGroupItem {
@@ -184,16 +191,12 @@ async function loadData() {
 
   try {
     const [groupResponse, modelResponse] = await Promise.all([
-      apiRequest<UserGroupItem[]>('/admin/user-groups', {
-        accessToken: auth.accessToken
-      }),
-      apiRequest<ModelItem[]>('/admin/models', {
-        accessToken: auth.accessToken
-      })
+      listAdminUserGroups<UserGroupItem[]>(auth.accessToken),
+      listAdminModels<ModelItem[]>(auth.accessToken)
     ])
 
-    groups.value = groupResponse.data
-    models.value = modelResponse.data
+    groups.value = groupResponse
+    models.value = modelResponse
 
     if (!selectedGroupID.value && groups.value.length > 0) {
       selectedGroupID.value = groups.value[0].id
@@ -210,16 +213,12 @@ async function createUserGroup() {
   errorMessage.value = ''
 
   try {
-    await apiRequest('/admin/user-groups', {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: {
-        name: createForm.name,
-        description: createForm.description || null,
-        status: createForm.status,
-        permissions: {},
-        metadata: {}
-      }
+    await createAdminUserGroup(auth.accessToken, {
+      name: createForm.name,
+      description: createForm.description || null,
+      status: createForm.status,
+      permissions: {},
+      metadata: {}
     })
 
     createForm.name = ''
@@ -242,9 +241,7 @@ async function loadPolicies() {
   errorMessage.value = ''
 
   try {
-    const { data } = await apiRequest<Array<Record<string, unknown>>>(`/admin/user-groups/${selectedGroupID.value}/limits`, {
-      accessToken: auth.accessToken
-    })
+    const data = await getAdminUserGroupLimits<Array<Record<string, unknown>>>(auth.accessToken, selectedGroupID.value)
     policyRows.value = data.map((item) => ({
       modelID: (item.model_id as string | null) ?? '',
       hourRequestLimit: toText(item.hour_request_limit),
@@ -275,21 +272,17 @@ async function savePolicies() {
   errorMessage.value = ''
 
   try {
-    await apiRequest(`/admin/user-groups/${selectedGroupID.value}/limits`, {
-      method: 'PUT',
-      accessToken: auth.accessToken,
-      body: {
-        policies: policyRows.value.map((row) => ({
-          model_id: row.modelID || null,
-          hour_request_limit: toNumberOrNull(row.hourRequestLimit),
-          week_request_limit: toNumberOrNull(row.weekRequestLimit),
-          lifetime_request_limit: toNumberOrNull(row.lifetimeRequestLimit),
-          hour_token_limit: toNumberOrNull(row.hourTokenLimit),
-          week_token_limit: toNumberOrNull(row.weekTokenLimit),
-          lifetime_token_limit: toNumberOrNull(row.lifetimeTokenLimit),
-          status: row.status
-        }))
-      }
+    await updateAdminUserGroupLimits(auth.accessToken, selectedGroupID.value, {
+      policies: policyRows.value.map((row) => ({
+        model_id: row.modelID || null,
+        hour_request_limit: toNumberOrNull(row.hourRequestLimit),
+        week_request_limit: toNumberOrNull(row.weekRequestLimit),
+        lifetime_request_limit: toNumberOrNull(row.lifetimeRequestLimit),
+        hour_token_limit: toNumberOrNull(row.hourTokenLimit),
+        week_token_limit: toNumberOrNull(row.weekTokenLimit),
+        lifetime_token_limit: toNumberOrNull(row.lifetimeTokenLimit),
+        status: row.status
+      }))
     })
 
     await loadPolicies()
