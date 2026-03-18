@@ -1,0 +1,65 @@
+/* 全局主题变量 */
+
+:root[data-theme="dark"] {
+  /* 背景色 - 深海蓝 */
+  --bg-primary: #091f2a;
+  --bg-secondary: #1b5d7e;
+
+  /* 玻璃态效果 */
+  --glass-bg: rgba(27, 93, 126, 0.6);
+  --glass-border: rgba(129, 195, 228, 0.3);
+
+  /* 文字颜色 */
+  --text-primary: #d5ebf6;
+  --text-secondary: #81c3e4;
+
+  /* 主题色 - 蓝色渐变 */
+  --accent-primary: #5eb8e5;
+  --accent-secondary: #a8d5ed;
+  --accent-glow: rgba(94, 184, 229, 0.25);
+
+  /* 输入框 */
+  --input-bg: rgba(27, 93, 126, 0.4);
+  --input-border: rgba(45, 155, 210, 0.3);
+
+  /* 错误色 */
+  --error-color: #ef4444;
+}
+
+:root[data-theme="light"] {
+  /* 背景色 - 浅蓝 */
+  --bg-primary: #d5ebf6;
+  --bg-secondary: #ffffff;
+
+  /* 玻璃态效果 */
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(45, 155, 210, 0.25);
+
+  /* 文字颜色 */
+  --text-primary: #091f2a;
+  --text-secondary: #1b5d7e;
+
+  /* 主题色 - 蓝色渐变 */
+  --accent-primary: #5eb8e5;
+  --accent-secondary: #4a9dc7;
+  --accent-glow: rgba(94, 184, 229, 0.2);
+
+  /* 输入框 */
+  --input-bg: rgba(255, 255, 255, 0.7);
+  --input-border: rgba(129, 195, 228, 0.5);
+
+  /* 错误色 */
+  --error-color: #dc2626;
+}
+
+/* 全局样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}

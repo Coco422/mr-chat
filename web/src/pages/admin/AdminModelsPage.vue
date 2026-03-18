@@ -1,85 +1,101 @@
 <template>
-  <section>
-    <h1>Models</h1>
-    <p v-if="errorMessage">{{ errorMessage }}</p>
+  <div class="admin-page">
+    <div class="page-header">
+      <h1>模型管理</h1>
+      <button class="primary-btn" @click="showForm = !showForm">
+        {{ showForm ? '取消' : '+ 新建模型' }}
+      </button>
+    </div>
 
-    <form @submit.prevent="createModel">
-      <div>
-        <label>
-          Model Key
-          <input v-model.trim="form.modelKey" type="text" required />
-        </label>
-      </div>
-      <div>
-        <label>
-          Display Name
-          <input v-model.trim="form.displayName" type="text" required />
-        </label>
-      </div>
-      <div>
-        <label>
-          Provider Type
-          <input v-model.trim="form.providerType" type="text" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Context Length
-          <input v-model.number="form.contextLength" type="number" min="1" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Max Output Tokens
-          <input v-model.number="form.maxOutputTokens" type="number" min="1" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Allowed Group IDs
-          <input v-model.trim="form.allowedGroupIDsRaw" type="text" placeholder="uuid1,uuid2" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Upstream
-          <select v-model="form.upstreamID">
-            <option value="">请选择</option>
-            <option v-for="upstream in upstreams" :key="upstream.id" :value="upstream.id">
-              {{ upstream.name }}
-            </option>
-          </select>
-        </label>
-      </div>
-      <div>
-        <label>
-          状态
-          <select v-model="form.status">
-            <option value="active">active</option>
-            <option value="disabled">disabled</option>
-          </select>
-        </label>
-      </div>
-      <button type="submit" :disabled="submitting">创建模型</button>
-      <button type="button" @click="loadData" :disabled="loading">刷新</button>
-    </form>
+    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-    <hr />
-
-    <p v-if="loading">加载中...</p>
-    <ul v-else-if="items.length > 0">
-      <li v-for="item in items" :key="item.id">
-        {{ item.display_name }} / {{ item.model_key }} / {{ item.status }}
-        <div>
-          bindings:
-          <span v-for="binding in item.route_bindings" :key="binding.id">
-            {{ binding.upstream_id }}#{{ binding.priority }}
-          </span>
+    <div v-if="showForm" class="form-card">
+      <h2>创建模型</h2>
+      <form @submit.prevent="createModel" class="admin-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Model Key</label>
+            <input v-model.trim="form.modelKey" type="text" required />
+          </div>
+          <div class="form-group">
+            <label>Display Name</label>
+            <input v-model.trim="form.displayName" type="text" required />
+          </div>
         </div>
-      </li>
-    </ul>
-    <p v-else>暂无模型</p>
-  </section>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Provider Type</label>
+            <input v-model.trim="form.providerType" type="text" />
+          </div>
+          <div class="form-group">
+            <label>Context Length</label>
+            <input v-model.number="form.contextLength" type="number" min="1" />
+          </div>
+          <div class="form-group">
+            <label>Max Output Tokens</label>
+            <input v-model.number="form.maxOutputTokens" type="number" min="1" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Upstream</label>
+            <el-select v-model="form.upstreamID">
+              <el-option value="" label="请选择" />
+              <el-option v-for="upstream in upstreams" :key="upstream.id" :value="upstream.id" :label="upstream.name" />
+            </el-select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <el-select v-model="form.status">
+              <el-option value="active" label="Active" />
+              <el-option value="disabled" label="Disabled" />
+            </el-select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Allowed Group IDs</label>
+          <input v-model.trim="form.allowedGroupIDsRaw" type="text" placeholder="uuid1,uuid2" />
+        </div>
+
+        <button type="submit" :disabled="submitting" class="submit-btn">创建模型</button>
+      </form>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <h2>模型列表</h2>
+        <button class="refresh-btn" @click="loadData" :disabled="loading">刷新</button>
+      </div>
+
+      <p v-if="loading" class="loading">加载中...</p>
+      <table v-else-if="items.length > 0">
+        <thead>
+          <tr>
+            <th>Display Name</th>
+            <th>Model Key</th>
+            <th>状态</th>
+            <th>Bindings</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in items" :key="item.id">
+            <td>{{ item.display_name }}</td>
+            <td>{{ item.model_key }}</td>
+            <td><span class="status-badge" :class="item.status">{{ item.status }}</span></td>
+            <td>
+              <span v-for="binding in item.route_bindings" :key="binding.id" class="binding-tag">
+                #{{ binding.priority }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty">暂无模型</p>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -109,6 +125,7 @@ const auth = useAuthStore()
 const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
+const showForm = ref(false)
 const upstreams = ref<UpstreamItem[]>([])
 const items = ref<ModelItem[]>([])
 const form = reactive({
@@ -189,6 +206,7 @@ async function createModel() {
     form.modelKey = ''
     form.displayName = ''
     form.allowedGroupIDsRaw = ''
+    showForm.value = false
     await loadData()
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
@@ -211,3 +229,17 @@ function toErrorMessage(error: unknown) {
   return '请求失败'
 }
 </script>
+
+<style scoped>
+@import '@/styles/admin.css';
+
+.binding-tag {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: var(--input-bg);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-right: 0.5rem;
+}
+</style>

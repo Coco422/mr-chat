@@ -1,45 +1,63 @@
 <template>
-  <section>
-    <h1>Audit Logs</h1>
-    <p v-if="errorMessage">{{ errorMessage }}</p>
+  <div class="admin-page">
+    <div class="page-header">
+      <h1>审计日志</h1>
+    </div>
 
-    <form @submit.prevent="loadLogs">
-      <div>
-        <label>
-          Action
-          <input v-model.trim="filters.action" type="text" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Resource Type
-          <input v-model.trim="filters.resourceType" type="text" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Result
-          <select v-model="filters.result">
-            <option value="">all</option>
-            <option value="success">success</option>
-            <option value="failure">failure</option>
-          </select>
-        </label>
-      </div>
-      <button type="submit" :disabled="loading">查询</button>
-    </form>
+    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-    <hr />
+    <div class="form-card">
+      <form @submit.prevent="loadLogs" class="admin-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Action</label>
+            <input v-model.trim="filters.action" type="text" />
+          </div>
+          <div class="form-group">
+            <label>Resource Type</label>
+            <input v-model.trim="filters.resourceType" type="text" />
+          </div>
+          <div class="form-group">
+            <label>Result</label>
+            <el-select v-model="filters.result">
+              <el-option value="" label="全部" />
+              <el-option value="success" label="Success" />
+              <el-option value="failure" label="Failure" />
+            </el-select>
+          </div>
+        </div>
+        <button type="submit" :disabled="loading" class="submit-btn">查询</button>
+      </form>
+    </div>
 
-    <p v-if="loading">加载中...</p>
-    <ul v-else-if="items.length > 0">
-      <li v-for="item in items" :key="item.id">
-        {{ item.action }} / {{ item.resource_type }} / {{ item.resource_id || '-' }} /
-        {{ item.result }} / {{ item.actor_user_id || '-' }} / {{ item.created_at }}
-      </li>
-    </ul>
-    <p v-else>暂无审计日志</p>
-  </section>
+    <div class="table-card">
+      <h2>日志列表</h2>
+      <p v-if="loading" class="loading">加载中...</p>
+      <table v-else-if="items.length > 0">
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Resource Type</th>
+            <th>Resource ID</th>
+            <th>Result</th>
+            <th>Actor</th>
+            <th>时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in items" :key="item.id">
+            <td>{{ item.action }}</td>
+            <td>{{ item.resource_type }}</td>
+            <td>{{ item.resource_id || '-' }}</td>
+            <td><span class="status-badge" :class="item.result">{{ item.result }}</span></td>
+            <td>{{ item.actor_user_id || '-' }}</td>
+            <td>{{ formatDate(item.created_at) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty">暂无审计日志</p>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -108,4 +126,12 @@ function toErrorMessage(error: unknown) {
   }
   return '请求失败'
 }
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleString('zh-CN')
+}
 </script>
+
+<style scoped>
+@import '@/styles/admin.css';
+</style>
