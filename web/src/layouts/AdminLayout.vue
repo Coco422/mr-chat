@@ -4,7 +4,11 @@
     <nav>
       <RouterLink to="/admin/upstreams">Upstreams</RouterLink>
       <span> | </span>
+      <RouterLink to="/admin/channels">Channels</RouterLink>
+      <span> | </span>
       <RouterLink to="/admin/models">Models</RouterLink>
+      <span> | </span>
+      <RouterLink to="/admin/user-groups">User Groups</RouterLink>
       <span> | </span>
       <RouterLink to="/admin/users">Users</RouterLink>
       <span> | </span>

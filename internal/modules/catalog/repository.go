@@ -15,6 +15,7 @@ import (
 var (
 	ErrUpstreamNotFound = errors.New("upstream not found")
 	ErrModelNotFound    = errors.New("model not found")
+	ErrChannelNotFound  = errors.New("channel not found")
 )
 
 type Repository struct {
@@ -38,6 +39,83 @@ func (r *Repository) ListUpstreams(ctx context.Context) ([]Upstream, error) {
 	}
 
 	return items, nil
+}
+
+func (r *Repository) ListChannels(ctx context.Context) ([]Channel, error) {
+	var items []Channel
+	if err := r.db.WithContext(ctx).
+		Order("created_at DESC").
+		Find(&items).Error; err != nil {
+		return nil, fmt.Errorf("list channels: %w", err)
+	}
+
+	return items, nil
+}
+
+func (r *Repository) CreateChannel(ctx context.Context, input CreateChannelInput) (*Channel, error) {
+	return r.CreateChannelWithDB(ctx, r.db, input)
+}
+
+func (r *Repository) CreateChannelWithDB(ctx context.Context, db *gorm.DB, input CreateChannelInput) (*Channel, error) {
+	if db == nil {
+		db = r.db
+	}
+
+	now := time.Now().UTC()
+	item := &Channel{
+		ID:            uuid.NewString(),
+		Name:          strings.TrimSpace(input.Name),
+		Description:   sanitizeOptionalString(input.Description),
+		Status:        ChannelStatus(defaultString(input.Status, string(ChannelStatusActive))),
+		BillingConfig: nonNilMap(input.BillingConfig),
+		Metadata:      nonNilMap(input.Metadata),
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	if err := db.WithContext(ctx).Create(item).Error; err != nil {
+		return nil, fmt.Errorf("create channel: %w", err)
+	}
+
+	return item, nil
+}
+
+func (r *Repository) UpdateChannel(ctx context.Context, channelID string, input UpdateChannelInput) (*Channel, error) {
+	return r.UpdateChannelWithDB(ctx, r.db, channelID, input)
+}
+
+func (r *Repository) UpdateChannelWithDB(ctx context.Context, db *gorm.DB, channelID string, input UpdateChannelInput) (*Channel, error) {
+	if db == nil {
+		db = r.db
+	}
+
+	item, err := r.getChannelByID(ctx, db, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	if input.Name != nil {
+		item.Name = strings.TrimSpace(*input.Name)
+	}
+	if input.Description != nil {
+		item.Description = sanitizeOptionalString(input.Description)
+	}
+	if input.Status != nil {
+		item.Status = ChannelStatus(strings.TrimSpace(*input.Status))
+	}
+	if input.BillingConfig != nil {
+		item.BillingConfig = nonNilMap(input.BillingConfig)
+	}
+	if input.Metadata != nil {
+		item.Metadata = nonNilMap(input.Metadata)
+	}
+
+	item.UpdatedAt = time.Now().UTC()
+	if err := db.WithContext(ctx).Save(item).Error; err != nil {
+		return nil, fmt.Errorf("update channel: %w", err)
+	}
+
+	return item, nil
 }
 
 func (r *Repository) CreateUpstream(ctx context.Context, input CreateUpstreamInput) (*Upstream, error) {
@@ -160,19 +238,19 @@ func (r *Repository) CreateModelWithDB(ctx context.Context, db *gorm.DB, input C
 
 	now := time.Now().UTC()
 	item := &Model{
-		ID:              uuid.NewString(),
-		ModelKey:        strings.TrimSpace(input.ModelKey),
-		DisplayName:     strings.TrimSpace(input.DisplayName),
-		ProviderType:    defaultString(input.ProviderType, "openai_compatible"),
-		ContextLength:   input.ContextLength,
-		MaxOutputTokens: input.MaxOutputTokens,
-		Pricing:         nonNilMap(input.Pricing),
-		Capabilities:    nonNilMap(input.Capabilities),
-		AllowedGroupIDs: sanitizeStrings(input.AllowedGroupIDs),
-		Status:          ModelStatus(defaultString(input.Status, string(ModelStatusActive))),
-		Metadata:        nonNilMap(input.Metadata),
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:                  uuid.NewString(),
+		ModelKey:            strings.TrimSpace(input.ModelKey),
+		DisplayName:         strings.TrimSpace(input.DisplayName),
+		ProviderType:        defaultString(input.ProviderType, "openai_compatible"),
+		ContextLength:       input.ContextLength,
+		MaxOutputTokens:     input.MaxOutputTokens,
+		Pricing:             nonNilMap(input.Pricing),
+		Capabilities:        nonNilMap(input.Capabilities),
+		VisibleUserGroupIDs: sanitizeStrings(input.VisibleUserGroupIDs),
+		Status:              ModelStatus(defaultString(input.Status, string(ModelStatusActive))),
+		Metadata:            nonNilMap(input.Metadata),
+		CreatedAt:           now,
+		UpdatedAt:           now,
 	}
 
 	if err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -230,8 +308,8 @@ func (r *Repository) UpdateModelWithDB(ctx context.Context, db *gorm.DB, modelID
 	if input.Capabilities != nil {
 		existing.Capabilities = nonNilMap(input.Capabilities)
 	}
-	if input.AllowedGroupIDs != nil {
-		existing.AllowedGroupIDs = sanitizeStrings(input.AllowedGroupIDs)
+	if input.VisibleUserGroupIDs != nil {
+		existing.VisibleUserGroupIDs = sanitizeStrings(input.VisibleUserGroupIDs)
 	}
 	if input.Status != nil {
 		existing.Status = ModelStatus(strings.TrimSpace(*input.Status))
@@ -325,11 +403,11 @@ func (r *Repository) replaceRouteBindings(ctx context.Context, db *gorm.DB, mode
 	now := time.Now().UTC()
 	rows := make([]ModelRouteBinding, 0, len(bindings))
 	for _, binding := range bindings {
-		groupID := sanitizeOptionalString(binding.GroupID)
+		channelID := sanitizeOptionalString(binding.ChannelID)
 		rows = append(rows, ModelRouteBinding{
 			ID:         uuid.NewString(),
 			ModelID:    modelID,
-			GroupID:    groupID,
+			ChannelID:  channelID,
 			UpstreamID: strings.TrimSpace(binding.UpstreamID),
 			Priority:   defaultInt(binding.Priority, 1),
 			Status:     RouteBindingStatus(defaultString(binding.Status, string(RouteBindingStatusActive))),
@@ -352,6 +430,17 @@ func (r *Repository) getUpstreamByID(ctx context.Context, db *gorm.DB, upstreamI
 			return nil, ErrUpstreamNotFound
 		}
 		return nil, fmt.Errorf("get upstream by id: %w", err)
+	}
+	return &item, nil
+}
+
+func (r *Repository) getChannelByID(ctx context.Context, db *gorm.DB, channelID string) (*Channel, error) {
+	var item Channel
+	if err := db.WithContext(ctx).First(&item, "id = ?", channelID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrChannelNotFound
+		}
+		return nil, fmt.Errorf("get channel by id: %w", err)
 	}
 	return &item, nil
 }

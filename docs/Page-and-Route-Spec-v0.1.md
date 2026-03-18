@@ -1,7 +1,7 @@
 # MrChat v0.1 页面与路由规格
 
 - 状态：实现设计草案
-- 日期：2026-03-12
+- 日期：2026-03-18
 - 依赖基线：`docs/Requirements-Baseline-v0.1.md`
 
 ## 1. 目标
@@ -27,7 +27,9 @@
 ### 2.2 管理侧一级导航
 
 - `Upstreams`
+- `Channels`
 - `Models`
+- `User Groups`
 - `Users`
 - `Redeem Codes`
 - `Audit Logs`
@@ -78,7 +80,9 @@
 | `/services/:serviceEntryId` | User/Admin/Root | P1 | iframe 容器页或跳转过渡页 |
 | `/admin` | Admin/Root | P0 | 管理后台默认入口，跳转到 `/admin/upstreams` |
 | `/admin/upstreams` | Admin/Root | P0 | 上游管理 |
+| `/admin/channels` | Admin/Root | P0 | 渠道与计费通道管理 |
 | `/admin/models` | Admin/Root | P0 | 模型管理 |
+| `/admin/user-groups` | Admin/Root | P0 | 用户分组与分组限额管理 |
 | `/admin/users` | Admin/Root | P0 | 用户与额度管理 |
 | `/admin/redeem-codes` | Admin/Root | P0 | 兑换码管理 |
 | `/admin/audit-logs` | Admin/Root | P0 | 审计日志 |
@@ -335,13 +339,14 @@
 - 显示名称
 - 定价倍率
 - 上下文长度
-- 可见组
+- 可见用户组
 - 状态
 
 关键交互：
 
 - 新建/编辑模型
-- 设置默认上游与优先级
+- 设置默认或按渠道的上游优先级
+- 配置 `visible_user_group_ids`
 
 依赖接口：
 
@@ -349,11 +354,63 @@
 - `POST /api/v1/admin/models`
 - `PUT /api/v1/admin/models/:id`
 
-## 5.11 `/admin/users`
+## 5.11 `/admin/channels`
 
 目标：
 
-- 查用户、看额度、做人工调额
+- 管理模型调用渠道、计费口径和路由归属
+
+表格字段建议：
+
+- 渠道名称
+- 状态
+- Description
+- Billing Config
+
+关键交互：
+
+- 新建/编辑渠道
+- 查看渠道是否被模型路由使用
+
+依赖接口：
+
+- `GET /api/v1/admin/channels`
+- `POST /api/v1/admin/channels`
+- `PUT /api/v1/admin/channels/:id`
+
+## 5.12 `/admin/user-groups`
+
+目标：
+
+- 管理用户运营分组和该分组的模型限额模板
+
+表格字段建议：
+
+- 分组名
+- 状态
+- 描述
+- 默认限额模板
+- 模型覆盖规则数
+
+关键交互：
+
+- 新建/编辑用户分组
+- 配置分组默认限额
+- 配置某模型覆盖规则
+
+依赖接口：
+
+- `GET /api/v1/admin/user-groups`
+- `POST /api/v1/admin/user-groups`
+- `PUT /api/v1/admin/user-groups/:id`
+- `GET /api/v1/admin/user-groups/:id/limits`
+- `PUT /api/v1/admin/user-groups/:id/limits`
+
+## 5.13 `/admin/users`
+
+目标：
+
+- 查用户、看额度、做人工调额与限额调整
 
 表格字段建议：
 
@@ -361,21 +418,29 @@
 - 邮箱
 - 角色
 - 状态
+- 用户分组
 - 当前额度
 - 累计消耗
 
 关键交互：
 
 - 搜索用户
+- 调整用户分组
 - 调整额度
+- 查询某模型下的 hour/week/lifetime 限额使用情况
+- 新增单用户 direct adjustment
 - 启用/禁用用户
 
 依赖接口：
 
 - `GET /api/v1/admin/users`
+- `PUT /api/v1/admin/users/:id/group`
 - `PUT /api/v1/admin/users/:id/quota`
+- `GET /api/v1/admin/users/:id/limit-usage`
+- `GET /api/v1/admin/users/:id/limit-adjustments`
+- `POST /api/v1/admin/users/:id/limit-adjustments`
 
-## 5.12 `/admin/redeem-codes`
+## 5.14 `/admin/redeem-codes`
 
 目标：
 
@@ -392,7 +457,7 @@
 - `POST /api/v1/admin/redeem-codes/batch`
 - `GET /api/v1/admin/redeem-codes`
 
-## 5.13 `/admin/audit-logs`
+## 5.15 `/admin/audit-logs`
 
 目标：
 
@@ -412,7 +477,7 @@
 
 - `GET /api/v1/admin/audit-logs`
 
-## 5.14 `/admin/service-entries`（P1）
+## 5.16 `/admin/service-entries`（P1）
 
 目标：
 

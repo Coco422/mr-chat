@@ -1,570 +1,448 @@
 # MrChat v0.1 数据模型与状态机
 
 - 状态：实现设计草案
-- 日期：2026-03-12
+- 日期：2026-03-18
 - 依赖基线：`docs/Requirements-Baseline-v0.1.md`
 
 ## 1. 目标
 
-这份文档定义 v0.1 的核心数据表、主要关系、关键索引与状态机，供后端表结构设计、ORM 建模与业务状态流转实现使用。
+这份文档定义 v0.1 当前已经收敛的数据域，重点覆盖用户分组、模型渠道、限额策略、请求日志与聊天状态流转。
 
 ## 2. 设计原则
 
 - 核心业务表统一使用 UUID 主键
-- 用户余额与用量分离：`users.quota` 表示当前余额，`quota_logs` 表示变动流水
-- 消息与会话做软删除
-- 持久化状态与运行时状态分开建模
-- 运行时冷却/黑名单优先放内存或 Redis，不强塞进主业务表
+- `users.user_group_id` 是用户唯一分组归属
+- `user_groups` 与 `channels` 必须拆分，不复用同一 `group` 语义
+- `quota_logs` 是余额账本真相
+- `llm_request_logs` 是请求次数、tokens、渠道与未来 RPM 聚合真相
+- 会话与消息使用软删除
+- 运行时冷却、限流和缓存优先放 Redis 或内存，可降级
 
 ## 3. 关系图
 
 ```mermaid
 erDiagram
     users ||--o{ auths : has
+    user_groups ||--o{ users : owns
     users ||--o{ conversations : owns
-    users ||--o{ quota_logs : has
-    users ||--o{ group_members : joins
-    groups ||--o{ group_members : contains
-    models ||--o{ model_route_bindings : binds
-    upstreams ||--o{ model_route_bindings : targets
     conversations ||--o{ messages : contains
-    messages ||--o{ quota_logs : bills
+    users ||--o{ quota_logs : has
+    user_groups ||--o{ user_group_model_limit_policies : defines
+    users ||--o{ user_limit_adjustments : receives
+    models ||--o{ user_group_model_limit_policies : overrides
+    models ||--o{ model_route_bindings : binds
+    channels ||--o{ model_route_bindings : scopes
+    upstreams ||--o{ model_route_bindings : targets
+    users ||--o{ llm_request_logs : sends
+    user_groups ||--o{ llm_request_logs : tags
+    models ||--o{ llm_request_logs : uses
+    channels ||--o{ llm_request_logs : routes
+    users ||--o{ audit_logs : acts
     redeem_codes ||--o{ redeem_redemptions : redeemed_by
     users ||--o{ redeem_redemptions : redeems
-    users ||--o{ audit_logs : acts
 ```
 
 ## 4. 核心数据表
 
-## 4.1 `users`
+### 4.1 `users`
 
 用途：
 
 - 用户主体信息
-- 当前角色与状态
-- 当前可用额度
+- 当前角色、状态、余额
+- 当前所属 `user_group`
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
+| `id` | uuid | 主键 |
 | `username` | varchar(50) | 唯一用户名 |
 | `email` | varchar(100) | 唯一邮箱 |
 | `display_name` | varchar(100) | 展示名 |
-| `avatar_url` | varchar(500) nullable | 头像 |
-| `role` | enum | `root/admin/user` |
-| `status` | enum | `active/disabled/pending` |
-| `quota` | bigint | 当前可用额度 |
-| `used_quota` | bigint | 累计已消耗额度，可作为汇总缓存 |
-| `primary_group_id` | uuid nullable | 默认用户组 |
-| `settings_json` | json | 时区、语言等偏好 |
-| `aff_code` | varchar(32) nullable | P1 邀请码 |
-| `inviter_id` | uuid nullable | P1 邀请人 |
-| `last_login_at` | timestamp nullable | 最近登录时间 |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
-| `deleted_at` | timestamp nullable | 软删除时间 |
+| `role` | varchar(16) | `root/admin/user` |
+| `status` | varchar(16) | `active/disabled/pending` |
+| `quota` | bigint | 当前余额 |
+| `used_quota` | bigint | 累计已消耗额度缓存 |
+| `user_group_id` | uuid nullable | 用户唯一分组 |
+| `settings_json` | jsonb | 时区、语言等偏好 |
+| `last_login_at` | timestamptz nullable | 最近登录时间 |
+| `created_at` | timestamptz | 创建时间 |
+| `updated_at` | timestamptz | 更新时间 |
+| `deleted_at` | timestamptz nullable | 软删除时间 |
 
-建议索引：
+关键索引：
 
 - unique(`username`)
 - unique(`email`)
 - index(`role`, `status`)
-- index(`primary_group_id`)
+- index(`user_group_id`)
 
-实现备注：
-
-- `quota` 是余额口径
-- 若保留 `used_quota`，要明确它是汇总缓存，不是账本真相源
-
-## 4.2 `auths`
+### 4.2 `auths`
 
 用途：
 
-- 认证凭据与登录来源
+- 存放密码或第三方认证凭据
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
+| `id` | uuid | 主键 |
 | `user_id` | uuid | 关联用户 |
-| `auth_type` | enum | `password/oauth` |
-| `provider` | varchar(50) nullable | `github/google/...` |
+| `auth_type` | varchar(32) | `password/oauth` |
+| `provider` | varchar(50) nullable | OAuth 来源 |
 | `provider_subject` | varchar(255) nullable | OAuth 主体 ID |
 | `password_hash` | varchar(255) nullable | 密码哈希 |
-| `verified_at` | timestamp nullable | 验证时间 |
-| `last_login_at` | timestamp nullable | 最近登录 |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
+| `verified_at` | timestamptz nullable | 验证时间 |
+| `last_login_at` | timestamptz nullable | 最近登录 |
 
-建议索引：
-
-- index(`user_id`)
-- unique(`provider`, `provider_subject`)
-
-## 4.3 `groups`
+### 4.3 `user_groups`
 
 用途：
 
-- 用户分组与模型可见性边界
+- 用户运营分组
+- 限额模板归属
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
-| `name` | varchar(100) | 组名 |
+| `id` | uuid | 主键 |
+| `name` | varchar(100) | 分组名 |
 | `description` | text nullable | 描述 |
-| `status` | enum | `active/disabled` |
-| `permissions_json` | json nullable | 可扩展权限 |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
+| `status` | varchar(16) | `active/disabled` |
+| `permissions_json` | jsonb | 扩展权限位 |
+| `metadata_json` | jsonb | 扩展元数据 |
+| `created_at` | timestamptz | 创建时间 |
+| `updated_at` | timestamptz | 更新时间 |
 
-## 4.4 `group_members`
+说明：
 
-用途：
+- v0.1 以 `users.user_group_id` 表达单归属
+- 历史 `groups` / `group_members` 仅作为迁移兼容来源保留，不再作为主业务真相
 
-- 用户与分组关系
-
-建议字段：
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | uuid string | 主键 |
-| `group_id` | uuid | 分组 ID |
-| `user_id` | uuid | 用户 ID |
-| `member_role` | enum | `owner/admin/member` |
-| `created_at` | timestamp | 加入时间 |
-
-建议索引：
-
-- unique(`group_id`, `user_id`)
-
-## 4.5 `upstreams`
+### 4.4 `upstreams`
 
 用途：
 
-- 存储实际请求目标与鉴权信息
+- 实际外部请求目标
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
+| `id` | uuid | 主键 |
 | `name` | varchar(100) | 名称 |
-| `provider_type` | enum | v0.1 先以 `openai_compatible` 为主 |
+| `provider_type` | varchar(50) | `openai_compatible` 为主 |
 | `base_url` | varchar(500) | 上游地址 |
-| `auth_type` | enum | `bearer/basic/custom` |
-| `auth_config_encrypted` | text | 加密后的密钥配置 |
-| `status` | enum | `active/disabled/maintenance` |
-| `timeout_seconds` | int | 超时 |
-| `cooldown_seconds` | int | 失败冷却时间 |
-| `failure_threshold` | int | 连续失败阈值 |
-| `metadata_json` | json nullable | 扩展配置 |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
+| `auth_type` | varchar(32) | `bearer/basic/custom` |
+| `auth_config_encrypted` | jsonb | 鉴权配置 |
+| `status` | varchar(32) | `active/disabled/maintenance` |
+| `timeout_seconds` | integer | 超时 |
+| `cooldown_seconds` | integer | 失败冷却时间 |
+| `failure_threshold` | integer | 连续失败阈值 |
 
-建议索引：
+### 4.5 `channels`
 
-- unique(`name`)
-- index(`status`)
-- index(`provider_type`)
+用途：
 
-实现备注：
+- 模型渠道、计费通道和路由维度
 
-- 冷却中的临时状态不建议直接写表
-- `blacklist_until` 与失败计数可优先存放在内存或 Redis
+关键字段：
 
-## 4.6 `models`
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | uuid | 主键 |
+| `name` | varchar(100) | 渠道名 |
+| `description` | text nullable | 描述 |
+| `status` | varchar(16) | `active/disabled` |
+| `billing_config_json` | jsonb | 计费与结算口径 |
+| `metadata_json` | jsonb | 扩展元数据 |
+
+### 4.6 `models`
 
 用途：
 
 - 用户面向的逻辑模型定义
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
+| `id` | uuid | 主键 |
 | `model_key` | varchar(100) | 逻辑模型标识 |
 | `display_name` | varchar(200) | 展示名 |
-| `provider_type` | enum | 请求协议类型 |
-| `context_length` | int | 上下文长度 |
-| `max_output_tokens` | int nullable | 输出上限 |
-| `pricing_json` | json | 输入/输出单价 |
-| `capabilities_json` | json | streaming、vision 等 |
-| `status` | enum | `active/disabled` |
-| `metadata_json` | json nullable | 扩展字段 |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
+| `provider_type` | varchar(50) | 请求协议类型 |
+| `context_length` | integer | 上下文长度 |
+| `max_output_tokens` | integer nullable | 输出上限 |
+| `pricing_json` | jsonb | 单价配置 |
+| `capabilities_json` | jsonb | streaming、vision 等能力 |
+| `visible_user_group_ids_json` | jsonb | 可见用户组列表，空数组表示全员可见 |
+| `status` | varchar(32) | `active/disabled` |
+| `metadata_json` | jsonb | 扩展字段 |
 
-建议索引：
-
-- unique(`model_key`)
-- index(`status`)
-
-## 4.7 `model_route_bindings`
+### 4.7 `model_route_bindings`
 
 用途：
 
-- 为模型建立默认或按分组的上游优先级列表
+- 为模型建立默认或按 `channel` 的上游优先级列表
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
+| `id` | uuid | 主键 |
 | `model_id` | uuid | 模型 ID |
-| `group_id` | uuid nullable | 为空表示全局默认 |
+| `channel_id` | uuid nullable | 为空表示默认路由 |
 | `upstream_id` | uuid | 上游 ID |
-| `priority` | int | 数值越小优先级越高 |
-| `status` | enum | `active/disabled` |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
+| `priority` | integer | 数字越小优先级越高 |
+| `status` | varchar(32) | `active/disabled` |
 
-建议索引：
+关键约束：
 
-- unique(`model_id`, `group_id`, `priority`)
-- index(`upstream_id`)
+- unique(`model_id`, `channel_id`, `priority`)
 
-## 4.8 `conversations`
+### 4.8 `conversations`
 
 用途：
 
-- 会话实体
+- 用户聊天会话
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
+| `id` | uuid | 主键 |
 | `user_id` | uuid | 所属用户 |
-| `title` | varchar(255) | 会话标题 |
-| `model_id` | uuid nullable | 当前默认模型 |
-| `status` | enum | `active/archived/deleted` |
-| `message_count` | int | 消息数缓存 |
-| `last_message_at` | timestamp nullable | 最近消息时间 |
-| `metadata_json` | json nullable | 扩展字段 |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
-| `deleted_at` | timestamp nullable | 软删除时间 |
+| `title` | varchar(200) | 标题 |
+| `model_id` | uuid nullable | 默认模型 |
+| `status` | varchar(16) | `active/archived/deleted` |
+| `message_count` | integer | 消息数缓存 |
+| `last_message_at` | timestamptz nullable | 最近消息时间 |
+| `metadata_json` | jsonb | 扩展数据 |
+| `deleted_at` | timestamptz nullable | 软删除时间 |
 
-建议索引：
-
-- index(`user_id`, `status`, `last_message_at`)
-
-## 4.9 `messages`
+### 4.9 `messages`
 
 用途：
 
-- 对话中的用户/助手消息
+- 会话消息正文与状态
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
-| `conversation_id` | uuid | 会话 ID |
+| `id` | uuid | 主键 |
+| `conversation_id` | uuid | 所属会话 |
 | `user_id` | uuid | 所属用户 |
-| `model_id` | uuid nullable | 本次使用模型 |
-| `upstream_id` | uuid nullable | 实际命中的上游 |
-| `request_id` | varchar(64) nullable | 请求追踪 ID |
-| `role` | enum | `system/user/assistant/tool` |
-| `content` | longtext | 正文 |
-| `reasoning_content` | longtext nullable | 推理内容 |
-| `status` | enum | `pending/streaming/completed/failed/cancelled` |
-| `finish_reason` | varchar(50) nullable | `stop/length/cancelled/error` |
-| `usage_json` | json nullable | token 统计 |
+| `model_id` | uuid nullable | 命中模型 |
+| `upstream_id` | uuid nullable | 命中上游 |
+| `request_id` | varchar(64) nullable | 请求 ID |
+| `role` | varchar(16) | `system/user/assistant/tool` |
+| `content` | text | 正文 |
+| `reasoning_content` | text nullable | 推理内容 |
+| `status` | varchar(16) | `pending/streaming/completed/failed/cancelled` |
+| `finish_reason` | varchar(32) nullable | 结束原因 |
+| `usage_json` | jsonb | token usage |
 | `error_code` | varchar(100) nullable | 错误码 |
-| `metadata_json` | json nullable | 扩展字段 |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
-| `deleted_at` | timestamp nullable | 软删除时间 |
+| `metadata_json` | jsonb | 扩展元数据 |
+| `deleted_at` | timestamptz nullable | 软删除时间 |
 
-建议索引：
-
-- index(`conversation_id`, `created_at`)
-- index(`request_id`)
-- index(`status`)
-
-实现备注：
-
-- 用户消息与助手消息都落在同一张表
-- 流式阶段建议只在内存中聚合，完成后再落库最终内容
-
-## 4.10 `quota_logs`
+### 4.10 `quota_logs`
 
 用途：
 
-- 额度账本流水
+- 余额账本流水
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
+| `id` | uuid | 主键 |
 | `user_id` | uuid | 用户 ID |
-| `conversation_id` | uuid nullable | 会话 ID |
-| `message_id` | uuid nullable | 关联消息 |
-| `model_id` | uuid nullable | 关联模型 |
-| `request_id` | varchar(64) nullable | 请求 ID |
-| `log_type` | enum | `pre_deduct/final_charge/refund/redeem/admin_adjust` |
-| `delta_quota` | bigint | 正数加额，负数扣额 |
-| `balance_after` | bigint | 操作后余额 |
-| `usage_json` | json nullable | usage 快照 |
-| `operator_user_id` | uuid nullable | 管理员调额操作者 |
+| `request_id` | varchar(64) nullable | 对应请求 |
+| `log_type` | varchar(32) | `pre_deduct/final_charge/refund/redeem/admin_adjust` |
+| `delta_quota` | bigint | 本次变化额度 |
+| `balance_after` | bigint | 变更后余额 |
 | `reason` | varchar(255) nullable | 原因 |
-| `created_at` | timestamp | 创建时间 |
+| `created_at` | timestamptz | 创建时间 |
 
-建议索引：
+说明：
 
-- index(`user_id`, `created_at`)
-- index(`request_id`)
-- index(`log_type`)
+- 只负责余额结算
+- 不承担请求次数、token 聚合真相
 
-实现备注：
-
-- `quota_logs` 是额度变动真相源
-- 对账与报表优先从这张表聚合
-
-## 4.11 `redeem_codes`
+### 4.11 `user_group_model_limit_policies`
 
 用途：
 
-- 兑换码主表
+- 用户组默认模板与模型覆盖规则
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
-| `batch_no` | varchar(64) | 批次号 |
-| `code_hash` | varchar(255) | 哈希值 |
-| `quota_amount` | bigint | 面额 |
-| `max_redemptions` | int | 最大兑换次数 |
-| `redeemed_count` | int | 已兑换次数 |
-| `status` | enum | `active/used/expired/disabled` |
-| `valid_from` | timestamp nullable | 生效时间 |
-| `valid_until` | timestamp nullable | 过期时间 |
-| `created_by` | uuid | 管理员 ID |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
+| `id` | uuid | 主键 |
+| `user_group_id` | uuid | 用户组 ID |
+| `model_id` | uuid nullable | 为空表示默认模板 |
+| `hour_request_limit` | bigint nullable | 最近 1 小时请求数上限 |
+| `week_request_limit` | bigint nullable | 最近 7 天请求数上限 |
+| `lifetime_request_limit` | bigint nullable | 生命周期请求数上限 |
+| `hour_token_limit` | bigint nullable | 最近 1 小时 tokens 上限 |
+| `week_token_limit` | bigint nullable | 最近 7 天 tokens 上限 |
+| `lifetime_token_limit` | bigint nullable | 生命周期 tokens 上限 |
+| `status` | varchar(16) | `active/disabled` |
 
-建议索引：
+规则：
 
-- unique(`code_hash`)
-- index(`batch_no`)
-- index(`status`, `valid_until`)
+- 先匹配 `(user_group_id, model_id)`
+- 再回退 `(user_group_id, null)`
+- 再命不中则视为无限额
 
-## 4.12 `redeem_redemptions`
+### 4.12 `user_limit_adjustments`
 
 用途：
 
-- 兑换成功记录
+- 单用户 direct adjustment 账本
 
-建议字段：
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| `id` | uuid string | 主键 |
-| `redeem_code_id` | uuid | 兑换码 ID |
-| `user_id` | uuid | 兑换用户 |
-| `quota_amount` | bigint | 实际增加额度 |
-| `quota_log_id` | uuid nullable | 对应账本流水 |
-| `created_at` | timestamp | 兑换时间 |
-
-建议索引：
-
-- unique(`redeem_code_id`, `user_id`) 仅适用于一次性码
-- index(`user_id`, `created_at`)
-
-实现备注：
-
-- 失败兑换尝试不一定要入本表，建议进入 `audit_logs`
-
-## 4.13 `audit_logs`
-
-用途：
-
-- 记录关键管理与安全相关行为
-
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
+| `id` | uuid | 主键 |
+| `user_id` | uuid | 用户 ID |
+| `model_id` | uuid nullable | 为空表示作用于全部模型 |
+| `metric_type` | varchar(32) | `request_count/total_tokens` |
+| `window_type` | varchar(32) | `rolling_hour/rolling_week/lifetime` |
+| `delta` | bigint | 增减量 |
+| `expires_at` | timestamptz nullable | 到期时间 |
+| `reason` | varchar(255) nullable | 调整原因 |
 | `actor_user_id` | uuid nullable | 操作者 |
-| `actor_role` | varchar(20) nullable | 操作者角色 |
-| `action` | varchar(100) | 动作 |
-| `resource_type` | varchar(100) | 资源类型 |
-| `resource_id` | varchar(100) nullable | 资源 ID |
-| `target_user_id` | uuid nullable | 目标用户 |
-| `request_id` | varchar(64) nullable | 请求 ID |
-| `ip_address` | varchar(64) nullable | IP |
-| `user_agent` | text nullable | UA |
-| `result` | enum | `success/failed` |
-| `detail_json` | json nullable | 细节 |
-| `created_at` | timestamp | 创建时间 |
+| `created_at` | timestamptz | 创建时间 |
 
-建议索引：
+规则：
 
-- index(`actor_user_id`, `created_at`)
-- index(`resource_type`, `resource_id`)
-- index(`action`, `created_at`)
+- `rolling_hour` 默认 `created_at + 1h`
+- `rolling_week` 默认 `created_at + 7d`
+- `lifetime` 不过期
 
-## 4.14 `service_entries`（P1）
+### 4.13 `llm_request_logs`
 
 用途：
 
-- 外部子服务入口配置
+- 记录每次聊天请求的统计、渠道、状态与错误
 
-建议字段：
+关键字段：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id` | uuid string | 主键 |
-| `name` | varchar(100) | 名称 |
-| `slug` | varchar(100) | 路由标识 |
-| `description` | text nullable | 描述 |
-| `entry_url` | varchar(500) | 入口地址 |
-| `launch_mode` | enum | `iframe/new_tab` |
-| `icon_url` | varchar(500) nullable | 图标 |
-| `badge` | varchar(50) nullable | 标签 |
-| `status` | enum | `active/disabled` |
-| `allowed_groups_json` | json nullable | 可见组 |
-| `sort_order` | int | 排序 |
-| `created_at` | timestamp | 创建时间 |
-| `updated_at` | timestamp | 更新时间 |
+| `id` | uuid | 主键 |
+| `request_id` | varchar(64) | 请求唯一标识 |
+| `user_id` | uuid | 用户 ID |
+| `user_group_id` | uuid nullable | 请求时用户分组 |
+| `conversation_id` | uuid nullable | 会话 ID |
+| `message_id` | uuid nullable | 消息 ID |
+| `model_id` | uuid nullable | 模型 ID |
+| `channel_id` | uuid nullable | 渠道 ID |
+| `prompt_tokens` | bigint | 输入 tokens |
+| `completion_tokens` | bigint | 输出 tokens |
+| `total_tokens` | bigint | 总 tokens |
+| `billed_quota` | bigint | 计费额度 |
+| `status` | varchar(32) | `pending/completed/failed/cancelled/rejected` |
+| `error_code` | varchar(100) nullable | 错误码 |
+| `started_at` | timestamptz | 开始时间 |
+| `completed_at` | timestamptz nullable | 完成时间 |
+| `metadata_json` | jsonb | 扩展元数据 |
 
-建议索引：
+说明：
 
-- unique(`slug`)
-- index(`status`, `sort_order`)
+- 未来 RPM、tokens 聚合、失败率与渠道报表都基于这张表或其缓存聚合
+- `rejected` 主要用于额度、权限或前置校验拒绝
+
+### 4.14 `redeem_codes` / `redeem_redemptions`
+
+用途：
+
+- 兑换码批次与兑换记录
+
+### 4.15 `audit_logs`
+
+用途：
+
+- 管理操作审计真相
+
+至少覆盖：
+
+- 上游变更
+- 渠道变更
+- 模型变更
+- 用户组变更
+- 用户分组调整
+- 用户额度调额
+- 用户限额调整
 
 ## 5. 状态机
 
-## 5.1 Conversation 状态
+### 5.1 UserGroup
 
-| 状态 | 含义 | 可流转到 |
-|---|---|---|
-| `active` | 正常使用中的会话 | `archived`、`deleted` |
-| `archived` | 归档会话 | `active`、`deleted` |
-| `deleted` | 软删除会话 | 无 |
+- `active` -> 可分配给用户，可参与模型可见性与限额解析
+- `disabled` -> 不再用于新分配；是否保留既有用户归属由后台策略控制
 
-规则：
+### 5.2 Channel
 
-- v0.1 删除采用软删除
-- 只有 `active` 会话出现在默认列表
+- `active` -> 可参与模型路由
+- `disabled` -> 不参与新请求路由
 
-## 5.2 Message 状态
+### 5.3 Model
 
-| 状态 | 含义 | 可流转到 |
-|---|---|---|
-| `pending` | 已接收请求，尚未开始生成 | `streaming`、`failed` |
-| `streaming` | 正在流式生成 | `completed`、`failed`、`cancelled` |
-| `completed` | 正常完成 | 无 |
-| `failed` | 生成失败 | 无 |
-| `cancelled` | 被用户停止或连接中断 | 无 |
+- `active` -> 对用户可见，且允许路由
+- `disabled` -> 不对用户提供
 
-规则：
+### 5.4 Conversation
 
-- `assistant` 消息最常见地经历 `pending -> streaming -> completed`
-- 用户消息通常可直接记为 `completed`
-- `cancelled` 也需要进入结算逻辑
+- `active` -> 正常可读写
+- `archived` -> 保留历史，默认不再写入
+- `deleted` -> 软删除
 
-## 5.3 Upstream 配置状态
+### 5.5 Message
 
-| 状态 | 含义 |
-|---|---|
-| `active` | 可参与路由 |
-| `disabled` | 人工停用，不参与路由 |
-| `maintenance` | 维护中，不参与路由 |
+- `pending` -> 已入队，等待上游
+- `streaming` -> 正在流式输出
+- `completed` -> 正常完成
+- `failed` -> 上游或系统失败
+- `cancelled` -> 用户或连接中断取消
 
-运行时补充状态：
+### 5.6 LLMRequestLog
 
-- `healthy`
-- `cooling_down`
+- `pending` -> 请求已创建，尚未结束
+- `completed` -> 成功完成
+- `failed` -> 上游失败或内部错误
+- `cancelled` -> 主动取消
+- `rejected` -> 在调用上游前被拒绝
 
-说明：
+## 6. 限额判定规则
 
-- 运行时状态建议放缓存，不直接作为主表字段真相
+- 先读取 `users.user_group_id`
+- 按 `user_group_model_limit_policies` 解析有效模板
+- 按 `llm_request_logs` 聚合最近 1h、7d、lifetime 的请求数与 tokens
+- 叠加 `user_limit_adjustments`
+- 请求数先校验 `used + 1 <= limit + adjustment`
+- token 再校验 `used + prompt_tokens + reserved_completion_tokens <= limit + adjustment`
+- 任一窗口超限则拒绝
 
-## 5.4 Redeem Code 状态
+## 7. 实现状态说明
 
-| 状态 | 含义 | 可流转到 |
-|---|---|---|
-| `active` | 可被兑换 | `used`、`expired`、`disabled` |
-| `used` | 单次码已被用完，或多次码达到上限 | 无 |
-| `expired` | 超过有效期 | 无 |
-| `disabled` | 人工停用 | `active` |
-
-规则：
-
-- 多次码在 `redeemed_count < max_redemptions` 且未过期时保持 `active`
-
-## 5.5 Chat 请求结算状态机
-
-```mermaid
-stateDiagram-v2
-    [*] --> Received
-    Received --> PreDeducted
-    Received --> Rejected
-    PreDeducted --> Streaming
-    PreDeducted --> FailedBeforeStream
-    Streaming --> Completed
-    Streaming --> Cancelled
-    Streaming --> Failed
-    Completed --> Settled
-    Cancelled --> Refunded
-    Failed --> Refunded
-    FailedBeforeStream --> Refunded
-```
-
-说明：
-
-- `Received -> PreDeducted`：先做额度预扣
-- `Streaming -> Completed`：按 usage 最终结算
-- `Cancelled / Failed`：退回未消耗额度
-- `Rejected`：例如权限不足、额度不足、模型不可用，不产生消息或账本流水
-
-## 6. 关键约束与不变量
-
-### 6.1 额度
-
-- 任意一次 `quota` 变更都必须有对应 `quota_logs`
-- `users.quota` 不得小于 0
-- `balance_after` 必须等于前余额加上本次 `delta_quota`
-
-### 6.2 路由
-
-- 对任一 `(model_id, group_id)`，优先级列表不能重复
-- 禁用的上游不能参与路由
-
-### 6.3 兑换码
-
-- 兑换码明文不能入库
-- 成功兑换与额度增加必须在同一事务中提交
-
-### 6.4 审计
-
-- 管理员调额、模型修改、上游修改、兑换码批量生成必须写审计日志
-
-## 7. 建议先落地的 ORM 模型顺序
-
-1. `users`
-2. `auths`
-3. `groups`
-4. `group_members`
-5. `upstreams`
-6. `models`
-7. `model_route_bindings`
-8. `conversations`
-9. `messages`
-10. `quota_logs`
-11. `redeem_codes`
-12. `redeem_redemptions`
-13. `audit_logs`
-14. `service_entries`（P1）
-
+- 当前数据库迁移已经包含：
+  - `user_groups`
+  - `channels`
+  - `user_group_model_limit_policies`
+  - `user_limit_adjustments`
+  - `llm_request_logs`
+- 当前后台 API 已支持：
+  - 用户组 CRUD
+  - 用户组限额模板批量维护
+  - 用户分组调整
+  - 用户限额使用查询
+  - 用户 direct adjustment
+- 当前 `POST /api/v1/chat/completions` 真实上游调用仍在后续里程碑中，限额引擎与请求日志结构已先行落地

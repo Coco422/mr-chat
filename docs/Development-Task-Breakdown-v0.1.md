@@ -1,7 +1,8 @@
 # MrChat v0.1 开发任务拆解清单
 
 - 状态：执行中
-- 日期：2026-03-17
+- 日期：2026-03-18
+- 更新摘要：已补 `user_groups` / `channels` / limit policies / user adjustments / `llm_request_logs` 设计与首版实现
 - 依赖文档：
   - `docs/Requirements-Baseline-v0.1.md`
   - `docs/Page-and-Route-Spec-v0.1.md`
@@ -11,7 +12,7 @@
 
 ## 0. 当前实现快照
 
-截至 `2026-03-17`，当前任务推进情况可简化理解为：
+截至 `2026-03-18`，当前任务推进情况可简化理解为：
 
 - 已落地：
   - `INF-01`、`INF-02`、`INF-03`、`INF-04`、`INF-06`、`INF-07`
@@ -22,18 +23,21 @@
   - `ADMIN-BE-03`、`ADMIN-BE-04`
   - `MODEL-BE-01`
   - `CHAT-BE-01`、`CHAT-BE-02`
+  - `GROUP-BE-01`
+  - `LIMIT-BE-01`
+  - `LIMIT-BE-02`
 - 已进入开发但未完全完成：
   - `INF-08`
   - `AUTH-BE-03`
   - `ADMIN-BE-01`
   - `ADMIN-BE-02`
-  - `GROUP-BE-01`
   - `CHAT-BE-03` ~ `CHAT-BE-08`
 
 当前已经可以稳定支撑：
 
 - 注册 / 登录 / 当前用户 / 个人设置 / 安全设置 / 用量页联调
 - Admin 上游 / 模型 / 用户调额 / 审计日志联调
+- Admin 渠道 / 用户组 / 分组限额 / 用户限额调整联调
 - Chat 侧模型列表、会话 CRUD、消息列表联调
 
 ## 1. 使用方式
@@ -101,9 +105,9 @@
 
 | 任务 ID | 任务 | 端别 | 优先级 | 规模 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|---|
-| `DB-01` | 建立 `users`、`auths`、`groups`、`group_members` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 可在 PostgreSQL 上通过 goose 成功迁移并回滚 |
-| `DB-02` | 建立 `upstreams`、`models`、`model_route_bindings` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 路由配置相关表可在 PostgreSQL 上通过 goose 迁移 |
-| `DB-03` | 建立 `conversations`、`messages`、`quota_logs` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 聊天与账本表可在 PostgreSQL 上通过 goose 迁移 |
+| `DB-01` | 建立 `users`、`auths`、用户分组基础迁移，并明确 `users.user_group_id` 单归属口径 | Backend | P0 | M | `INF-01`、`INF-07` | 可在 PostgreSQL 上通过 goose 成功迁移并回滚 |
+| `DB-02` | 建立 `upstreams`、`channels`、`models`、`model_route_bindings` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 路由配置相关表可在 PostgreSQL 上通过 goose 迁移 |
+| `DB-03` | 建立 `conversations`、`messages`、`quota_logs`、`llm_request_logs` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 聊天、账本和请求日志表可在 PostgreSQL 上通过 goose 迁移 |
 | `DB-04` | 建立 `redeem_codes`、`redeem_redemptions`、`audit_logs` 迁移 | Backend | P0 | M | `INF-01`、`INF-07` | 兑换与审计表可在 PostgreSQL 上通过 goose 迁移 |
 | `AUTH-BE-01` | 实现注册、登录、退出、刷新 token | Backend | P0 | M | `DB-01` | 四个接口按契约工作 |
 | `AUTH-BE-02` | 实现 JWT/角色中间件与受保护路由守卫 | Backend | P0 | M | `AUTH-BE-01` | `User/Admin/Root` 权限可控 |
@@ -121,10 +125,12 @@
 | 任务 ID | 任务 | 端别 | 优先级 | 规模 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|---|
 | `ADMIN-BE-01` | 实现上游 CRUD API | Backend | P0 | M | `DB-02`、`AUTH-BE-02` | 可增删改查上游 |
-| `ADMIN-BE-02` | 实现模型 CRUD API、可见组配置与路由绑定保存 | Backend | P0 | L | `DB-02`、`ADMIN-BE-01` | 模型、可见组和优先级绑定可维护 |
+| `ADMIN-BE-02` | 实现模型 CRUD API、可见用户组配置与渠道路由绑定保存 | Backend | P0 | L | `DB-02`、`ADMIN-BE-01` | 模型、可见用户组和优先级绑定可维护 |
 | `ADMIN-BE-03` | 实现用户查询与人工调额 API | Backend | P0 | M | `DB-03`、`DB-04` | 可按用户调额并写账本/审计 |
 | `ADMIN-BE-04` | 实现审计日志查询 API | Backend | P0 | S | `DB-04` | 后台可查关键操作日志 |
-| `GROUP-BE-01` | 实现用户组 CRUD 与成员维护 API | Backend | P0 | M | `DB-01`、`AUTH-BE-02` | 管理员可维护组、成员归属，并供模型可见性与路由分组使用 |
+| `GROUP-BE-01` | 实现 `user_groups` CRUD 与单用户归属维护 API | Backend | P0 | M | `DB-01`、`AUTH-BE-02` | 管理员可维护用户组与用户归属，并供模型可见性与限额策略使用 |
+| `LIMIT-BE-01` | 实现用户组模型限额模板 API | Backend | P0 | M | `DB-01`、`DB-02`、`AUTH-BE-02` | 可批量维护默认模板与模型覆盖规则 |
+| `LIMIT-BE-02` | 实现用户限额使用统计与 direct adjustment API | Backend | P0 | M | `LIMIT-BE-01`、`DB-03`、`AUTH-BE-02` | 可查询 hour/week/lifetime 使用与剩余额度，并记录单用户调整 |
 | `MODEL-BE-01` | 实现 `GET /models` 用户侧模型列表 API | Backend | P0 | S | `ADMIN-BE-02`、`GROUP-BE-01`、`AUTH-BE-02` | `/chat` 首屏可返回当前用户有权限看到的模型列表 |
 | `ADMIN-FE-01` | 管理后台壳子与导航 | Frontend | P0 | M | `APP-FE-01` | `/admin/*` 页面框架可用 |
 | `ADMIN-FE-02` | 上游管理页 | Frontend | P0 | M | `ADMIN-BE-01` | 能配置和修改上游 |
@@ -143,7 +149,7 @@
 | `CHAT-BE-05` | 实现 Chat Completions 接口（SSE/非流式）与断连取消 | Backend | P0 | L | `CHAT-BE-03` | 同一入口支持流式/非流式，SSE 能稳定输出并响应 stop |
 | `CHAT-BE-06` | 实现消息持久化与状态流转 | Backend | P0 | M | `CHAT-BE-05`、`DB-03` | 消息状态可经历 `pending/streaming/completed/...` |
 | `CHAT-BE-07` | 实现 usage 采集与本地估算回退 | Backend | P0 | M | `CHAT-BE-05` | 上游无 usage 时仍可结算 |
-| `CHAT-BE-08` | 实现请求日志、路由日志、错误码收敛 | Backend | P0 | M | `INF-06`、`CHAT-BE-04` | 一次聊天可完整追踪请求链路 |
+| `CHAT-BE-08` | 实现请求日志、路由日志、错误码收敛 | Backend | P0 | M | `INF-06`、`CHAT-BE-04` | `llm_request_logs` 可完整追踪一次聊天请求链路，并为 RPM/限额聚合提供数据源 |
 
 ## 8. M4：Chat 前端闭环
 

@@ -4,8 +4,10 @@ import AdminLayout from '@/layouts/AdminLayout.vue'
 import AppLayout from '@/layouts/AppLayout.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import AdminAuditLogsPage from '@/pages/admin/AdminAuditLogsPage.vue'
+import AdminChannelsPage from '@/pages/admin/AdminChannelsPage.vue'
 import AdminModelsPage from '@/pages/admin/AdminModelsPage.vue'
 import AdminRedeemCodesPage from '@/pages/admin/AdminRedeemCodesPage.vue'
+import AdminUserGroupsPage from '@/pages/admin/AdminUserGroupsPage.vue'
 import AdminUpstreamsPage from '@/pages/admin/AdminUpstreamsPage.vue'
 import AdminUsersPage from '@/pages/admin/AdminUsersPage.vue'
 import ChatPage from '@/pages/ChatPage.vue'
@@ -87,6 +89,16 @@ const router = createRouter({
           path: 'models',
           name: 'admin-models',
           component: AdminModelsPage
+        },
+        {
+          path: 'channels',
+          name: 'admin-channels',
+          component: AdminChannelsPage
+        },
+        {
+          path: 'user-groups',
+          name: 'admin-user-groups',
+          component: AdminUserGroupsPage
         },
         {
           path: 'users',

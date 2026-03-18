@@ -46,10 +46,9 @@ func (s *Service) ListVisibleModels(ctx context.Context, userID string) ([]UserM
 		return toUserModels(items), nil
 	}
 
-	allowedGroupIDs := loadUserGroupIDs(ctx, s.accountRepo, user)
 	result := make([]UserModel, 0, len(items))
 	for _, item := range items {
-		if isVisibleToGroups(item.Model.AllowedGroupIDs, allowedGroupIDs) {
+		if isVisibleToUserGroup(item.Model.VisibleUserGroupIDs, user.UserGroupID) {
 			result = append(result, toUserModel(item.Model))
 		}
 	}
@@ -57,42 +56,15 @@ func (s *Service) ListVisibleModels(ctx context.Context, userID string) ([]UserM
 	return result, nil
 }
 
-func loadUserGroupIDs(ctx context.Context, repo *account.Repository, user *account.User) []string {
-	if user == nil {
-		return nil
-	}
-
-	result := make([]string, 0)
-	if user.PrimaryGroupID != nil && *user.PrimaryGroupID != "" {
-		result = append(result, *user.PrimaryGroupID)
-	}
-
-	var memberGroupIDs []string
-	repo.DB().
-		WithContext(ctx).
-		Model(&account.GroupMember{}).
-		Where("user_id = ?", user.ID).
-		Pluck("group_id", &memberGroupIDs)
-
-	for _, groupID := range memberGroupIDs {
-		if groupID != "" && !slices.Contains(result, groupID) {
-			result = append(result, groupID)
-		}
-	}
-
-	return result
-}
-
-func isVisibleToGroups(allowedGroupIDs, userGroupIDs []string) bool {
-	if len(allowedGroupIDs) == 0 {
+func isVisibleToUserGroup(visibleUserGroupIDs []string, userGroupID *string) bool {
+	if len(visibleUserGroupIDs) == 0 {
 		return true
 	}
-	for _, allowed := range allowedGroupIDs {
-		if slices.Contains(userGroupIDs, allowed) {
-			return true
-		}
+	if userGroupID == nil || *userGroupID == "" {
+		return false
 	}
-	return false
+
+	return slices.Contains(visibleUserGroupIDs, *userGroupID)
 }
 
 func toUserModels(items []ModelWithBindings) []UserModel {

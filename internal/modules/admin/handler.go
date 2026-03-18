@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +13,7 @@ import (
 	"mrchat/internal/modules/account"
 	"mrchat/internal/modules/audit"
 	"mrchat/internal/modules/catalog"
+	"mrchat/internal/modules/limits"
 	"mrchat/internal/shared/httpx"
 )
 
@@ -32,23 +34,66 @@ type upstreamRequest struct {
 	Metadata         map[string]any `json:"metadata"`
 }
 
+type channelRequest struct {
+	Name          string         `json:"name"`
+	Description   *string        `json:"description"`
+	Status        string         `json:"status"`
+	BillingConfig map[string]any `json:"billing_config"`
+	Metadata      map[string]any `json:"metadata"`
+}
+
 type modelRequest struct {
-	ModelKey        string                      `json:"model_key"`
-	DisplayName     string                      `json:"display_name"`
-	ProviderType    string                      `json:"provider_type"`
-	ContextLength   int                         `json:"context_length"`
-	MaxOutputTokens *int                        `json:"max_output_tokens"`
-	Pricing         map[string]any              `json:"pricing"`
-	Capabilities    map[string]any              `json:"capabilities"`
-	AllowedGroupIDs []string                    `json:"allowed_group_ids"`
-	Status          string                      `json:"status"`
-	Metadata        map[string]any              `json:"metadata"`
-	RouteBindings   []catalog.RouteBindingInput `json:"route_bindings"`
+	ModelKey            string                      `json:"model_key"`
+	DisplayName         string                      `json:"display_name"`
+	ProviderType        string                      `json:"provider_type"`
+	ContextLength       int                         `json:"context_length"`
+	MaxOutputTokens     *int                        `json:"max_output_tokens"`
+	Pricing             map[string]any              `json:"pricing"`
+	Capabilities        map[string]any              `json:"capabilities"`
+	VisibleUserGroupIDs []string                    `json:"visible_user_group_ids"`
+	Status              string                      `json:"status"`
+	Metadata            map[string]any              `json:"metadata"`
+	RouteBindings       []catalog.RouteBindingInput `json:"route_bindings"`
+}
+
+type userGroupRequest struct {
+	Name        string         `json:"name"`
+	Description *string        `json:"description"`
+	Status      string         `json:"status"`
+	Permissions map[string]any `json:"permissions"`
+	Metadata    map[string]any `json:"metadata"`
+}
+
+type replacePoliciesRequest struct {
+	Policies []policyRequest `json:"policies"`
+}
+
+type policyRequest struct {
+	ModelID              *string `json:"model_id"`
+	HourRequestLimit     *int64  `json:"hour_request_limit"`
+	WeekRequestLimit     *int64  `json:"week_request_limit"`
+	LifetimeRequestLimit *int64  `json:"lifetime_request_limit"`
+	HourTokenLimit       *int64  `json:"hour_token_limit"`
+	WeekTokenLimit       *int64  `json:"week_token_limit"`
+	LifetimeTokenLimit   *int64  `json:"lifetime_token_limit"`
+	Status               string  `json:"status"`
+}
+
+type assignUserGroupRequest struct {
+	UserGroupID *string `json:"user_group_id"`
 }
 
 type quotaAdjustmentRequest struct {
 	Delta  int64  `json:"delta"`
 	Reason string `json:"reason"`
+}
+
+type userLimitAdjustmentRequest struct {
+	ModelID    *string `json:"model_id"`
+	MetricType string  `json:"metric_type"`
+	WindowType string  `json:"window_type"`
+	Delta      int64   `json:"delta"`
+	Reason     *string `json:"reason"`
 }
 
 func NewHandler(service *Service) *Handler {
@@ -107,6 +152,59 @@ func (h *Handler) UpdateUpstream(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toUpstream(item))
 }
 
+func (h *Handler) ListChannels(c *gin.Context) {
+	items, err := h.service.ListChannels(c.Request.Context())
+	if err != nil {
+		h.internalError(c)
+		return
+	}
+	httpx.Success(c, http.StatusOK, toChannels(items))
+}
+
+func (h *Handler) CreateChannel(c *gin.Context) {
+	var req channelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid channel payload", gin.H{"error": err.Error()})
+		return
+	}
+
+	item, err := h.service.CreateChannel(c.Request.Context(), actorFromContext(c), CreateChannelInput{
+		Name:          req.Name,
+		Description:   req.Description,
+		Status:        req.Status,
+		BillingConfig: req.BillingConfig,
+		Metadata:      req.Metadata,
+	})
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusCreated, toChannel(item))
+}
+
+func (h *Handler) UpdateChannel(c *gin.Context) {
+	var req channelRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid channel payload", gin.H{"error": err.Error()})
+		return
+	}
+
+	item, err := h.service.UpdateChannel(c.Request.Context(), actorFromContext(c), c.Param("id"), UpdateChannelInput{
+		Name:          &req.Name,
+		Description:   req.Description,
+		Status:        &req.Status,
+		BillingConfig: req.BillingConfig,
+		Metadata:      req.Metadata,
+	})
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toChannel(item))
+}
+
 func (h *Handler) ListModels(c *gin.Context) {
 	items, err := h.service.ListModels(c.Request.Context())
 	if err != nil {
@@ -123,7 +221,19 @@ func (h *Handler) CreateModel(c *gin.Context) {
 		return
 	}
 
-	item, err := h.service.CreateModel(c.Request.Context(), actorFromContext(c), CreateModelInput(req))
+	item, err := h.service.CreateModel(c.Request.Context(), actorFromContext(c), CreateModelInput{
+		ModelKey:            req.ModelKey,
+		DisplayName:         req.DisplayName,
+		ProviderType:        req.ProviderType,
+		ContextLength:       req.ContextLength,
+		MaxOutputTokens:     req.MaxOutputTokens,
+		Pricing:             req.Pricing,
+		Capabilities:        req.Capabilities,
+		VisibleUserGroupIDs: req.VisibleUserGroupIDs,
+		Status:              req.Status,
+		Metadata:            req.Metadata,
+		RouteBindings:       req.RouteBindings,
+	})
 	if err != nil {
 		h.handleError(c, err)
 		return
@@ -140,17 +250,17 @@ func (h *Handler) UpdateModel(c *gin.Context) {
 	}
 
 	item, err := h.service.UpdateModel(c.Request.Context(), actorFromContext(c), c.Param("id"), UpdateModelInput{
-		ModelKey:        &req.ModelKey,
-		DisplayName:     &req.DisplayName,
-		ProviderType:    &req.ProviderType,
-		ContextLength:   &req.ContextLength,
-		MaxOutputTokens: req.MaxOutputTokens,
-		Pricing:         req.Pricing,
-		Capabilities:    req.Capabilities,
-		AllowedGroupIDs: req.AllowedGroupIDs,
-		Status:          &req.Status,
-		Metadata:        req.Metadata,
-		RouteBindings:   req.RouteBindings,
+		ModelKey:            &req.ModelKey,
+		DisplayName:         &req.DisplayName,
+		ProviderType:        &req.ProviderType,
+		ContextLength:       &req.ContextLength,
+		MaxOutputTokens:     req.MaxOutputTokens,
+		Pricing:             req.Pricing,
+		Capabilities:        req.Capabilities,
+		VisibleUserGroupIDs: req.VisibleUserGroupIDs,
+		Status:              &req.Status,
+		Metadata:            req.Metadata,
+		RouteBindings:       req.RouteBindings,
 	})
 	if err != nil {
 		h.handleError(c, err)
@@ -158,6 +268,99 @@ func (h *Handler) UpdateModel(c *gin.Context) {
 	}
 
 	httpx.Success(c, http.StatusOK, toAdminModel(*item))
+}
+
+func (h *Handler) ListUserGroups(c *gin.Context) {
+	items, err := h.service.ListUserGroups(c.Request.Context())
+	if err != nil {
+		h.internalError(c)
+		return
+	}
+	httpx.Success(c, http.StatusOK, toUserGroups(items))
+}
+
+func (h *Handler) CreateUserGroup(c *gin.Context) {
+	var req userGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid user group payload", gin.H{"error": err.Error()})
+		return
+	}
+
+	item, err := h.service.CreateUserGroup(c.Request.Context(), actorFromContext(c), CreateUserGroupInput{
+		Name:        req.Name,
+		Description: req.Description,
+		Status:      account.UserGroupStatus(strings.TrimSpace(req.Status)),
+		Permissions: req.Permissions,
+		Metadata:    req.Metadata,
+	})
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusCreated, toUserGroup(item))
+}
+
+func (h *Handler) UpdateUserGroup(c *gin.Context) {
+	var req userGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid user group payload", gin.H{"error": err.Error()})
+		return
+	}
+
+	status := account.UserGroupStatus(strings.TrimSpace(req.Status))
+	item, err := h.service.UpdateUserGroup(c.Request.Context(), actorFromContext(c), c.Param("id"), UpdateUserGroupInput{
+		Name:        &req.Name,
+		Description: req.Description,
+		Status:      &status,
+		Permissions: req.Permissions,
+		Metadata:    req.Metadata,
+	})
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toUserGroup(item))
+}
+
+func (h *Handler) GetUserGroupLimitPolicies(c *gin.Context) {
+	items, err := h.service.ListUserGroupLimitPolicies(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+	httpx.Success(c, http.StatusOK, toPolicies(items))
+}
+
+func (h *Handler) UpdateUserGroupLimitPolicies(c *gin.Context) {
+	var req replacePoliciesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid limit policy payload", gin.H{"error": err.Error()})
+		return
+	}
+
+	inputs := make([]PolicyUpsertInput, 0, len(req.Policies))
+	for _, policy := range req.Policies {
+		inputs = append(inputs, PolicyUpsertInput{
+			ModelID:              policy.ModelID,
+			HourRequestLimit:     policy.HourRequestLimit,
+			WeekRequestLimit:     policy.WeekRequestLimit,
+			LifetimeRequestLimit: policy.LifetimeRequestLimit,
+			HourTokenLimit:       policy.HourTokenLimit,
+			WeekTokenLimit:       policy.WeekTokenLimit,
+			LifetimeTokenLimit:   policy.LifetimeTokenLimit,
+			Status:               limits.PolicyStatus(strings.TrimSpace(policy.Status)),
+		})
+	}
+
+	items, err := h.service.ReplaceUserGroupLimitPolicies(c.Request.Context(), actorFromContext(c), c.Param("id"), inputs)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toPolicies(items))
 }
 
 func (h *Handler) ListUsers(c *gin.Context) {
@@ -181,6 +384,22 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	})
 }
 
+func (h *Handler) AssignUserGroup(c *gin.Context) {
+	var req assignUserGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid user group assignment payload", gin.H{"error": err.Error()})
+		return
+	}
+
+	item, err := h.service.AssignUserGroup(c.Request.Context(), actorFromContext(c), c.Param("id"), req.UserGroupID)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toAdminUser(AdminUserRecord{User: *item}))
+}
+
 func (h *Handler) AdjustUserQuota(c *gin.Context) {
 	var req quotaAdjustmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -194,7 +413,68 @@ func (h *Handler) AdjustUserQuota(c *gin.Context) {
 		return
 	}
 
-	httpx.Success(c, http.StatusOK, toAdminUser(*item))
+	httpx.Success(c, http.StatusOK, toAdminUser(AdminUserRecord{User: *item}))
+}
+
+func (h *Handler) GetUserLimitUsage(c *gin.Context) {
+	modelID := optionalQueryString(c.Query("model_id"))
+	report, err := h.service.GetUserLimitUsage(c.Request.Context(), c.Param("id"), modelID)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, report)
+}
+
+func (h *Handler) ListUserLimitAdjustments(c *gin.Context) {
+	page := parsePositiveInt(c.DefaultQuery("page", "1"), 1)
+	pageSize := parsePositiveInt(c.DefaultQuery("page_size", "20"), 20)
+	modelID := optionalQueryString(c.Query("model_id"))
+	result, err := h.service.ListUserLimitAdjustments(c.Request.Context(), c.Param("id"), modelID, page, pageSize)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.SuccessWithMeta(c, http.StatusOK, toUserLimitAdjustments(result.Items), gin.H{
+		"page":      page,
+		"page_size": pageSize,
+		"total":     result.Total,
+	})
+}
+
+func (h *Handler) CreateUserLimitAdjustment(c *gin.Context) {
+	var req userLimitAdjustmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid user limit adjustment payload", gin.H{"error": err.Error()})
+		return
+	}
+
+	metricType, ok := parseMetricType(req.MetricType)
+	if !ok {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "metric_type must be request_count or total_tokens", nil)
+		return
+	}
+	windowType, ok := parseWindowType(req.WindowType)
+	if !ok {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "window_type must be rolling_hour, rolling_week or lifetime", nil)
+		return
+	}
+
+	item, err := h.service.CreateUserLimitAdjustment(c.Request.Context(), actorFromContext(c), c.Param("id"), CreateUserLimitAdjustmentInput{
+		ModelID:    req.ModelID,
+		MetricType: metricType,
+		WindowType: windowType,
+		Delta:      req.Delta,
+		Reason:     req.Reason,
+	})
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusCreated, toUserLimitAdjustment(item))
 }
 
 func (h *Handler) ListAuditLogs(c *gin.Context) {
@@ -226,8 +506,12 @@ func (h *Handler) handleError(c *gin.Context, err error) {
 		httpx.Failure(c, http.StatusNotFound, "UPSTREAM_NOT_FOUND", "Upstream not found", nil)
 	case errors.Is(err, catalog.ErrModelNotFound):
 		httpx.Failure(c, http.StatusNotFound, "MODEL_NOT_FOUND", "Model not found", nil)
+	case errors.Is(err, catalog.ErrChannelNotFound):
+		httpx.Failure(c, http.StatusNotFound, "CHANNEL_NOT_FOUND", "Channel not found", nil)
 	case errors.Is(err, account.ErrUserNotFound):
 		httpx.Failure(c, http.StatusNotFound, "USER_NOT_FOUND", "User not found", nil)
+	case errors.Is(err, account.ErrUserGroupNotFound):
+		httpx.Failure(c, http.StatusNotFound, "USER_GROUP_NOT_FOUND", "User group not found", nil)
 	case errors.Is(err, ErrQuotaWouldBecomeNegative):
 		httpx.Failure(c, http.StatusBadRequest, "QUOTA_NEGATIVE_NOT_ALLOWED", "Quota cannot become negative", nil)
 	default:
@@ -260,6 +544,38 @@ func parsePositiveInt(value string, fallback int) int {
 	return parsed
 }
 
+func parseMetricType(value string) (limits.MetricType, bool) {
+	switch strings.TrimSpace(value) {
+	case string(limits.MetricTypeRequestCount):
+		return limits.MetricTypeRequestCount, true
+	case string(limits.MetricTypeTotalTokens):
+		return limits.MetricTypeTotalTokens, true
+	default:
+		return "", false
+	}
+}
+
+func parseWindowType(value string) (limits.WindowType, bool) {
+	switch strings.TrimSpace(value) {
+	case string(limits.WindowTypeRollingHour):
+		return limits.WindowTypeRollingHour, true
+	case string(limits.WindowTypeRollingWeek):
+		return limits.WindowTypeRollingWeek, true
+	case string(limits.WindowTypeLifetime):
+		return limits.WindowTypeLifetime, true
+	default:
+		return "", false
+	}
+}
+
+func optionalQueryString(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
 func toUpstreams(items []catalog.Upstream) []gin.H {
 	result := make([]gin.H, 0, len(items))
 	for _, item := range items {
@@ -289,6 +605,30 @@ func toUpstream(item *catalog.Upstream) gin.H {
 	}
 }
 
+func toChannels(items []catalog.Channel) []gin.H {
+	result := make([]gin.H, 0, len(items))
+	for _, item := range items {
+		result = append(result, toChannel(&item))
+	}
+	return result
+}
+
+func toChannel(item *catalog.Channel) gin.H {
+	if item == nil {
+		return gin.H{}
+	}
+	return gin.H{
+		"id":             item.ID,
+		"name":           item.Name,
+		"description":    item.Description,
+		"status":         item.Status,
+		"billing_config": item.BillingConfig,
+		"metadata":       item.Metadata,
+		"created_at":     item.CreatedAt.UTC().Format(timeLayout),
+		"updated_at":     item.UpdatedAt.UTC().Format(timeLayout),
+	}
+}
+
 func toAdminModels(items []catalog.ModelWithBindings) []gin.H {
 	result := make([]gin.H, 0, len(items))
 	for _, item := range items {
@@ -302,7 +642,7 @@ func toAdminModel(item catalog.ModelWithBindings) gin.H {
 	for _, binding := range item.RouteBindings {
 		bindings = append(bindings, gin.H{
 			"id":          binding.ID,
-			"group_id":    binding.GroupID,
+			"channel_id":  binding.ChannelID,
 			"upstream_id": binding.UpstreamID,
 			"priority":    binding.Priority,
 			"status":      binding.Status,
@@ -310,24 +650,69 @@ func toAdminModel(item catalog.ModelWithBindings) gin.H {
 	}
 
 	return gin.H{
-		"id":                item.Model.ID,
-		"model_key":         item.Model.ModelKey,
-		"display_name":      item.Model.DisplayName,
-		"provider_type":     item.Model.ProviderType,
-		"context_length":    item.Model.ContextLength,
-		"max_output_tokens": item.Model.MaxOutputTokens,
-		"pricing":           item.Model.Pricing,
-		"capabilities":      item.Model.Capabilities,
-		"allowed_group_ids": item.Model.AllowedGroupIDs,
-		"status":            item.Model.Status,
-		"metadata":          item.Model.Metadata,
-		"route_bindings":    bindings,
-		"created_at":        item.Model.CreatedAt.UTC().Format(timeLayout),
-		"updated_at":        item.Model.UpdatedAt.UTC().Format(timeLayout),
+		"id":                     item.Model.ID,
+		"model_key":              item.Model.ModelKey,
+		"display_name":           item.Model.DisplayName,
+		"provider_type":          item.Model.ProviderType,
+		"context_length":         item.Model.ContextLength,
+		"max_output_tokens":      item.Model.MaxOutputTokens,
+		"pricing":                item.Model.Pricing,
+		"capabilities":           item.Model.Capabilities,
+		"visible_user_group_ids": item.Model.VisibleUserGroupIDs,
+		"status":                 item.Model.Status,
+		"metadata":               item.Model.Metadata,
+		"route_bindings":         bindings,
+		"created_at":             item.Model.CreatedAt.UTC().Format(timeLayout),
+		"updated_at":             item.Model.UpdatedAt.UTC().Format(timeLayout),
 	}
 }
 
-func toAdminUsers(items []account.User) []gin.H {
+func toUserGroups(items []account.UserGroup) []gin.H {
+	result := make([]gin.H, 0, len(items))
+	for _, item := range items {
+		result = append(result, toUserGroup(&item))
+	}
+	return result
+}
+
+func toUserGroup(item *account.UserGroup) gin.H {
+	if item == nil {
+		return gin.H{}
+	}
+	return gin.H{
+		"id":          item.ID,
+		"name":        item.Name,
+		"description": item.Description,
+		"status":      item.Status,
+		"permissions": item.Permissions,
+		"metadata":    item.Metadata,
+		"created_at":  item.CreatedAt.UTC().Format(timeLayout),
+		"updated_at":  item.UpdatedAt.UTC().Format(timeLayout),
+	}
+}
+
+func toPolicies(items []limits.UserGroupModelLimitPolicy) []gin.H {
+	result := make([]gin.H, 0, len(items))
+	for _, item := range items {
+		result = append(result, gin.H{
+			"id":                     item.ID,
+			"user_group_id":          item.UserGroupID,
+			"model_id":               item.ModelID,
+			"hour_request_limit":     item.HourRequestLimit,
+			"week_request_limit":     item.WeekRequestLimit,
+			"lifetime_request_limit": item.LifetimeRequestLimit,
+			"hour_token_limit":       item.HourTokenLimit,
+			"week_token_limit":       item.WeekTokenLimit,
+			"lifetime_token_limit":   item.LifetimeTokenLimit,
+			"status":                 item.Status,
+			"created_at":             item.CreatedAt.UTC().Format(timeLayout),
+			"updated_at":             item.UpdatedAt.UTC().Format(timeLayout),
+		})
+	}
+	return result
+}
+
+func toAdminUsers(items []AdminUserRecord) []gin.H {
 	result := make([]gin.H, 0, len(items))
 	for _, item := range items {
 		result = append(result, toAdminUser(item))
@@ -335,19 +720,48 @@ func toAdminUsers(items []account.User) []gin.H {
 	return result
 }
 
-func toAdminUser(item account.User) gin.H {
+func toAdminUser(item AdminUserRecord) gin.H {
+	return gin.H{
+		"id":            item.User.ID,
+		"username":      item.User.Username,
+		"email":         item.User.Email,
+		"display_name":  item.User.DisplayName,
+		"role":          item.User.Role,
+		"status":        item.User.Status,
+		"quota":         item.User.Quota,
+		"used_quota":    item.User.UsedQuota,
+		"user_group_id": item.User.UserGroupID,
+		"user_group":    toUserGroup(item.UserGroup),
+		"last_login_at": formatOptionalTime(item.User.LastLoginAt),
+		"created_at":    item.User.CreatedAt.UTC().Format(timeLayout),
+		"updated_at":    item.User.UpdatedAt.UTC().Format(timeLayout),
+	}
+}
+
+func toUserLimitAdjustments(items []limits.UserLimitAdjustment) []gin.H {
+	result := make([]gin.H, 0, len(items))
+	for _, item := range items {
+		result = append(result, toUserLimitAdjustment(&item))
+	}
+	return result
+}
+
+func toUserLimitAdjustment(item *limits.UserLimitAdjustment) gin.H {
+	if item == nil {
+		return gin.H{}
+	}
+
 	return gin.H{
 		"id":            item.ID,
-		"username":      item.Username,
-		"email":         item.Email,
-		"display_name":  item.DisplayName,
-		"role":          item.Role,
-		"status":        item.Status,
-		"quota":         item.Quota,
-		"used_quota":    item.UsedQuota,
-		"last_login_at": formatOptionalTime(item.LastLoginAt),
+		"user_id":       item.UserID,
+		"model_id":      item.ModelID,
+		"metric_type":   item.MetricType,
+		"window_type":   item.WindowType,
+		"delta":         item.Delta,
+		"expires_at":    formatOptionalTime(item.ExpiresAt),
+		"reason":        item.Reason,
+		"actor_user_id": item.ActorUserID,
 		"created_at":    item.CreatedAt.UTC().Format(timeLayout),
-		"updated_at":    item.UpdatedAt.UTC().Format(timeLayout),
 	}
 }
 

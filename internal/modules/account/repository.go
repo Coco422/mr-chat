@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrUserNotFound     = errors.New("user not found")
-	ErrPasswordNotFound = errors.New("password auth not found")
+	ErrUserNotFound      = errors.New("user not found")
+	ErrUserGroupNotFound = errors.New("user group not found")
+	ErrPasswordNotFound  = errors.New("password auth not found")
 )
 
 type Repository struct {
@@ -34,6 +35,22 @@ type UpdateUserProfileInput struct {
 	DisplayName *string
 	AvatarURL   *string
 	Settings    *UserSettings
+}
+
+type CreateUserGroupInput struct {
+	Name        string
+	Description *string
+	Status      UserGroupStatus
+	Permissions map[string]any
+	Metadata    map[string]any
+}
+
+type UpdateUserGroupInput struct {
+	Name        *string
+	Description *string
+	Status      *UserGroupStatus
+	Permissions map[string]any
+	Metadata    map[string]any
 }
 
 type SecurityInfo struct {
@@ -250,6 +267,118 @@ func (r *Repository) UpdateUserProfile(ctx context.Context, userID string, input
 	return user, nil
 }
 
+func (r *Repository) ListUserGroups(ctx context.Context) ([]UserGroup, error) {
+	var items []UserGroup
+	if err := r.db.WithContext(ctx).
+		Order("created_at ASC").
+		Find(&items).Error; err != nil {
+		return nil, fmt.Errorf("list user groups: %w", err)
+	}
+
+	return items, nil
+}
+
+func (r *Repository) GetUserGroupByID(ctx context.Context, userGroupID string) (*UserGroup, error) {
+	var item UserGroup
+	if err := r.db.WithContext(ctx).First(&item, "id = ?", userGroupID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserGroupNotFound
+		}
+		return nil, fmt.Errorf("get user group by id: %w", err)
+	}
+
+	return &item, nil
+}
+
+func (r *Repository) CreateUserGroup(ctx context.Context, input CreateUserGroupInput) (*UserGroup, error) {
+	return r.CreateUserGroupWithDB(ctx, r.db, input)
+}
+
+func (r *Repository) CreateUserGroupWithDB(ctx context.Context, db *gorm.DB, input CreateUserGroupInput) (*UserGroup, error) {
+	if db == nil {
+		db = r.db
+	}
+
+	now := time.Now().UTC()
+	item := &UserGroup{
+		ID:          uuid.NewString(),
+		Name:        strings.TrimSpace(input.Name),
+		Description: sanitizeOptionalString(input.Description),
+		Status:      defaultUserGroupStatus(input.Status),
+		Permissions: nonNilJSONMap(input.Permissions),
+		Metadata:    nonNilJSONMap(input.Metadata),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if err := db.WithContext(ctx).Create(item).Error; err != nil {
+		return nil, fmt.Errorf("create user group: %w", err)
+	}
+
+	return item, nil
+}
+
+func (r *Repository) UpdateUserGroup(ctx context.Context, userGroupID string, input UpdateUserGroupInput) (*UserGroup, error) {
+	return r.UpdateUserGroupWithDB(ctx, r.db, userGroupID, input)
+}
+
+func (r *Repository) UpdateUserGroupWithDB(ctx context.Context, db *gorm.DB, userGroupID string, input UpdateUserGroupInput) (*UserGroup, error) {
+	if db == nil {
+		db = r.db
+	}
+
+	item, err := r.getUserGroupByID(ctx, db, userGroupID)
+	if err != nil {
+		return nil, err
+	}
+
+	if input.Name != nil {
+		item.Name = strings.TrimSpace(*input.Name)
+	}
+	if input.Description != nil {
+		item.Description = sanitizeOptionalString(input.Description)
+	}
+	if input.Status != nil {
+		item.Status = *input.Status
+	}
+	if input.Permissions != nil {
+		item.Permissions = nonNilJSONMap(input.Permissions)
+	}
+	if input.Metadata != nil {
+		item.Metadata = nonNilJSONMap(input.Metadata)
+	}
+
+	item.UpdatedAt = time.Now().UTC()
+	if err := db.WithContext(ctx).Save(item).Error; err != nil {
+		return nil, fmt.Errorf("update user group: %w", err)
+	}
+
+	return item, nil
+}
+
+func (r *Repository) AssignUserGroup(ctx context.Context, userID string, userGroupID *string) (*User, error) {
+	return r.AssignUserGroupWithDB(ctx, r.db, userID, userGroupID)
+}
+
+func (r *Repository) AssignUserGroupWithDB(ctx context.Context, db *gorm.DB, userID string, userGroupID *string) (*User, error) {
+	if db == nil {
+		db = r.db
+	}
+
+	user, err := r.getUserByID(ctx, db, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	user.UserGroupID = sanitizeOptionalString(userGroupID)
+	user.UpdatedAt = time.Now().UTC()
+	if err := db.WithContext(ctx).Save(user).Error; err != nil {
+		return nil, fmt.Errorf("assign user group: %w", err)
+	}
+
+	return user, nil
+}
+
 func (r *Repository) UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error {
 	updates := map[string]any{
 		"password_hash": passwordHash,
@@ -264,6 +393,31 @@ func (r *Repository) UpdatePasswordHash(ctx context.Context, userID, passwordHas
 	}
 
 	return nil
+}
+
+func (r *Repository) getUserByID(ctx context.Context, db *gorm.DB, userID string) (*User, error) {
+	var user User
+	if err := db.WithContext(ctx).First(&user, "id = ?", userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, fmt.Errorf("get user by id: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (r *Repository) getUserGroupByID(ctx context.Context, db *gorm.DB, userGroupID string) (*UserGroup, error) {
+	var item UserGroup
+	if err := db.WithContext(ctx).First(&item, "id = ?", userGroupID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserGroupNotFound
+		}
+		return nil, fmt.Errorf("get user group by id: %w", err)
+	}
+
+	return &item, nil
 }
 
 func (r *Repository) GetSecurityInfo(ctx context.Context, userID string) (SecurityInfo, error) {
@@ -399,8 +553,37 @@ func defaultStatus(status UserStatus) UserStatus {
 	return status
 }
 
+func defaultUserGroupStatus(status UserGroupStatus) UserGroupStatus {
+	if status == "" {
+		return UserGroupStatusActive
+	}
+
+	return status
+}
+
 func normalizeIdentifier(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func sanitizeOptionalString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
+}
+
+func nonNilJSONMap(value map[string]any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
+
+	return value
 }
 
 func usageWindow(rangeKey string, now time.Time) (time.Time, time.Time) {

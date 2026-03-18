@@ -36,8 +36,19 @@
       </div>
       <div>
         <label>
-          Allowed Group IDs
-          <input v-model.trim="form.allowedGroupIDsRaw" type="text" placeholder="uuid1,uuid2" />
+          Visible User Group IDs
+          <input v-model.trim="form.visibleUserGroupIDsRaw" type="text" placeholder="uuid1,uuid2" />
+        </label>
+      </div>
+      <div>
+        <label>
+          Channel
+          <select v-model="form.channelID">
+            <option value="">默认路由</option>
+            <option v-for="channel in channels" :key="channel.id" :value="channel.id">
+              {{ channel.name }}
+            </option>
+          </select>
         </label>
       </div>
       <div>
@@ -71,9 +82,13 @@
       <li v-for="item in items" :key="item.id">
         {{ item.display_name }} / {{ item.model_key }} / {{ item.status }}
         <div>
+          visible_user_group_ids:
+          {{ item.visible_user_group_ids.length > 0 ? item.visible_user_group_ids.join(', ') : 'all users' }}
+        </div>
+        <div>
           bindings:
           <span v-for="binding in item.route_bindings" :key="binding.id">
-            {{ binding.upstream_id }}#{{ binding.priority }}
+            {{ binding.channel_id || 'default' }} -> {{ binding.upstream_id }}#{{ binding.priority }}
           </span>
         </div>
       </li>
@@ -93,13 +108,25 @@ interface UpstreamItem {
   name: string
 }
 
+interface ChannelItem {
+  id: string
+  name: string
+}
+
+interface UserGroupItem {
+  id: string
+  name: string
+}
+
 interface ModelItem {
   id: string
   model_key: string
   display_name: string
   status: string
+  visible_user_group_ids: string[]
   route_bindings: Array<{
     id: string
+    channel_id: string | null
     upstream_id: string
     priority: number
   }>
@@ -110,6 +137,8 @@ const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
 const upstreams = ref<UpstreamItem[]>([])
+const channels = ref<ChannelItem[]>([])
+const userGroups = ref<UserGroupItem[]>([])
 const items = ref<ModelItem[]>([])
 const form = reactive({
   modelKey: '',
@@ -117,7 +146,8 @@ const form = reactive({
   providerType: 'openai_compatible',
   contextLength: 32000,
   maxOutputTokens: 4096,
-  allowedGroupIDsRaw: '',
+  visibleUserGroupIDsRaw: '',
+  channelID: '',
   upstreamID: '',
   status: 'active'
 })
@@ -131,17 +161,25 @@ async function loadData() {
   errorMessage.value = ''
 
   try {
-    const [modelsResponse, upstreamsResponse] = await Promise.all([
+    const [modelsResponse, upstreamsResponse, channelsResponse, userGroupsResponse] = await Promise.all([
       apiRequest<ModelItem[]>('/admin/models', {
         accessToken: auth.accessToken
       }),
       apiRequest<UpstreamItem[]>('/admin/upstreams', {
+        accessToken: auth.accessToken
+      }),
+      apiRequest<ChannelItem[]>('/admin/channels', {
+        accessToken: auth.accessToken
+      }),
+      apiRequest<UserGroupItem[]>('/admin/user-groups', {
         accessToken: auth.accessToken
       })
     ])
 
     items.value = modelsResponse.data
     upstreams.value = upstreamsResponse.data
+    channels.value = channelsResponse.data
+    userGroups.value = userGroupsResponse.data
 
     if (!form.upstreamID && upstreams.value.length > 0) {
       form.upstreamID = upstreams.value[0].id
@@ -171,12 +209,13 @@ async function createModel() {
         capabilities: {
           chat: true
         },
-        allowed_group_ids: parseCSV(form.allowedGroupIDsRaw),
+        visible_user_group_ids: parseCSV(form.visibleUserGroupIDsRaw),
         status: form.status,
         metadata: {},
         route_bindings: form.upstreamID
           ? [
               {
+                channel_id: form.channelID || null,
                 upstream_id: form.upstreamID,
                 priority: 1,
                 status: 'active'
@@ -188,7 +227,7 @@ async function createModel() {
 
     form.modelKey = ''
     form.displayName = ''
-    form.allowedGroupIDsRaw = ''
+    form.visibleUserGroupIDsRaw = ''
     await loadData()
   } catch (error) {
     errorMessage.value = toErrorMessage(error)

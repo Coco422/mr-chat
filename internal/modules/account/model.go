@@ -29,11 +29,11 @@ const (
 	AuthTypeOAuth    AuthType = "oauth"
 )
 
-type GroupStatus string
+type UserGroupStatus string
 
 const (
-	GroupStatusActive   GroupStatus = "active"
-	GroupStatusDisabled GroupStatus = "disabled"
+	UserGroupStatusActive   UserGroupStatus = "active"
+	UserGroupStatusDisabled UserGroupStatus = "disabled"
 )
 
 type GroupMemberRole string
@@ -60,21 +60,21 @@ type UserSettings struct {
 }
 
 type User struct {
-	ID             string         `gorm:"type:uuid;primaryKey"`
-	Username       string         `gorm:"column:username"`
-	Email          string         `gorm:"column:email"`
-	DisplayName    string         `gorm:"column:display_name"`
-	AvatarURL      *string        `gorm:"column:avatar_url"`
-	Role           Role           `gorm:"column:role"`
-	Status         UserStatus     `gorm:"column:status"`
-	Quota          int64          `gorm:"column:quota"`
-	UsedQuota      int64          `gorm:"column:used_quota"`
-	PrimaryGroupID *string        `gorm:"column:primary_group_id"`
-	Settings       UserSettings   `gorm:"column:settings_json;type:jsonb;serializer:json"`
-	LastLoginAt    *time.Time     `gorm:"column:last_login_at"`
-	CreatedAt      time.Time      `gorm:"column:created_at"`
-	UpdatedAt      time.Time      `gorm:"column:updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"column:deleted_at"`
+	ID          string         `gorm:"type:uuid;primaryKey"`
+	Username    string         `gorm:"column:username"`
+	Email       string         `gorm:"column:email"`
+	DisplayName string         `gorm:"column:display_name"`
+	AvatarURL   *string        `gorm:"column:avatar_url"`
+	Role        Role           `gorm:"column:role"`
+	Status      UserStatus     `gorm:"column:status"`
+	Quota       int64          `gorm:"column:quota"`
+	UsedQuota   int64          `gorm:"column:used_quota"`
+	UserGroupID *string        `gorm:"column:user_group_id"`
+	Settings    UserSettings   `gorm:"column:settings_json;type:jsonb;serializer:json"`
+	LastLoginAt *time.Time     `gorm:"column:last_login_at"`
+	CreatedAt   time.Time      `gorm:"column:created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at"`
 }
 
 func (User) TableName() string {
@@ -98,30 +98,19 @@ func (Auth) TableName() string {
 	return "auths"
 }
 
-type Group struct {
-	ID              string      `gorm:"type:uuid;primaryKey"`
-	Name            string      `gorm:"column:name"`
-	Description     *string     `gorm:"column:description"`
-	Status          GroupStatus `gorm:"column:status"`
-	PermissionsJSON string      `gorm:"column:permissions_json"`
-	CreatedAt       time.Time   `gorm:"column:created_at"`
-	UpdatedAt       time.Time   `gorm:"column:updated_at"`
+type UserGroup struct {
+	ID          string          `gorm:"type:uuid;primaryKey"`
+	Name        string          `gorm:"column:name"`
+	Description *string         `gorm:"column:description"`
+	Status      UserGroupStatus `gorm:"column:status"`
+	Permissions map[string]any  `gorm:"column:permissions_json;type:jsonb;serializer:json"`
+	Metadata    map[string]any  `gorm:"column:metadata_json;type:jsonb;serializer:json"`
+	CreatedAt   time.Time       `gorm:"column:created_at"`
+	UpdatedAt   time.Time       `gorm:"column:updated_at"`
 }
 
-func (Group) TableName() string {
-	return "groups"
-}
-
-type GroupMember struct {
-	ID         string          `gorm:"type:uuid;primaryKey"`
-	GroupID    string          `gorm:"column:group_id"`
-	UserID     string          `gorm:"column:user_id"`
-	MemberRole GroupMemberRole `gorm:"column:member_role"`
-	CreatedAt  time.Time       `gorm:"column:created_at"`
-}
-
-func (GroupMember) TableName() string {
-	return "group_members"
+func (UserGroup) TableName() string {
+	return "user_groups"
 }
 
 type QuotaLog struct {

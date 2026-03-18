@@ -20,6 +20,7 @@ import (
 	"mrchat/internal/modules/catalog"
 	"mrchat/internal/modules/chat"
 	"mrchat/internal/modules/health"
+	"mrchat/internal/modules/limits"
 	"mrchat/internal/modules/users"
 	"mrchat/internal/platform/cache"
 	"mrchat/internal/platform/database"
@@ -60,13 +61,15 @@ func main() {
 	accountRepository := account.NewRepository(dbClient.DB)
 	auditRepository := audit.NewRepository(dbClient.DB)
 	catalogRepository := catalog.NewRepository(dbClient.DB)
+	limitsRepository := limits.NewRepository(dbClient.DB)
 	tokenManager := authmodule.NewTokenManager(cfg.Auth)
 	authService := authmodule.NewService(accountRepository, tokenManager)
 	userService := users.NewService(accountRepository)
 	billingService := billing.NewService(accountRepository)
 	catalogService := catalog.NewService(catalogRepository, accountRepository)
+	limitsService := limits.NewService(limitsRepository, accountRepository)
 	chatService := chat.NewService(chat.NewRepository(dbClient.DB))
-	adminService := admin.NewService(accountRepository, catalogRepository, auditRepository)
+	adminService := admin.NewService(accountRepository, catalogRepository, limitsService, auditRepository)
 
 	healthHandler := health.NewHandler(cfg, dbClient, redisClient)
 	authHandler := authmodule.NewHandler(cfg.Auth, authService)

@@ -1,7 +1,7 @@
 # MrChat v0.1 API 契约
 
 - 状态：实现设计草案
-- 日期：2026-03-12
+- 日期：2026-03-18
 - 依赖基线：`docs/Requirements-Baseline-v0.1.md`
 
 ## 1. 目标
@@ -111,11 +111,56 @@
     "vision": false,
     "function_calling": false
   },
+  "visible_user_group_ids": ["uuid"],
   "status": "active"
 }
 ```
 
-### 3.3 ConversationSummary
+### 3.3 Channel
+
+```json
+{
+  "id": "uuid",
+  "name": "default-openai",
+  "description": "default billing channel",
+  "status": "active",
+  "billing_config": {
+    "currency": "USD"
+  }
+}
+```
+
+### 3.4 UserGroup
+
+```json
+{
+  "id": "uuid",
+  "name": "free",
+  "description": "free tier users",
+  "status": "active",
+  "permissions": {},
+  "metadata": {}
+}
+```
+
+### 3.5 UserGroupLimitPolicy
+
+```json
+{
+  "id": "uuid",
+  "user_group_id": "uuid",
+  "model_id": null,
+  "hour_request_limit": 30,
+  "week_request_limit": 500,
+  "lifetime_request_limit": null,
+  "hour_token_limit": 200000,
+  "week_token_limit": 1000000,
+  "lifetime_token_limit": null,
+  "status": "active"
+}
+```
+
+### 3.6 ConversationSummary
 
 ```json
 {
@@ -128,7 +173,7 @@
 }
 ```
 
-### 3.4 Message
+### 3.7 Message
 
 ```json
 {
@@ -148,7 +193,24 @@
 }
 ```
 
-### 3.5 ServiceEntry（P1）
+### 3.8 UserLimitAdjustment
+
+```json
+{
+  "id": "uuid",
+  "user_id": "uuid",
+  "model_id": null,
+  "metric_type": "request_count",
+  "window_type": "rolling_hour",
+  "delta": 10,
+  "expires_at": "2026-03-18T10:00:00Z",
+  "reason": "support grant",
+  "actor_user_id": "uuid",
+  "created_at": "2026-03-18T09:00:00Z"
+}
+```
+
+### 3.9 ServiceEntry（P1）
 
 ```json
 {
@@ -701,10 +763,10 @@ data: [DONE]
     "output_price": 0.6,
     "currency": "USD"
   },
-  "allowed_group_ids": ["uuid"],
+  "visible_user_group_ids": ["uuid"],
   "route_bindings": [
     {
-      "group_id": "uuid",
+      "channel_id": "uuid",
       "upstream_id": "uuid",
       "priority": 1
     }
@@ -716,7 +778,123 @@ data: [DONE]
 
 - 用于修改模型展示、定价、可见性与路由绑定
 
-## 11.9 `POST /api/v1/admin/redeem-codes/batch`
+## 11.9 `GET /api/v1/admin/channels`
+
+- 返回渠道列表
+
+## 11.10 `POST /api/v1/admin/channels`
+
+请求：
+
+```json
+{
+  "name": "default-openai",
+  "description": "default billing channel",
+  "status": "active",
+  "billing_config": {
+    "currency": "USD"
+  },
+  "metadata": {}
+}
+```
+
+## 11.11 `PUT /api/v1/admin/channels/:id`
+
+- 用于修改渠道状态、描述与计费配置
+
+## 11.12 `GET /api/v1/admin/user-groups`
+
+- 返回用户分组列表
+
+## 11.13 `POST /api/v1/admin/user-groups`
+
+请求：
+
+```json
+{
+  "name": "free",
+  "description": "free tier users",
+  "status": "active",
+  "permissions": {},
+  "metadata": {}
+}
+```
+
+## 11.14 `PUT /api/v1/admin/user-groups/:id`
+
+- 用于修改分组名称、描述、状态和权限
+
+## 11.15 `GET /api/v1/admin/user-groups/:id/limits`
+
+- 返回该用户分组的默认模板与模型覆盖规则列表
+
+## 11.16 `PUT /api/v1/admin/user-groups/:id/limits`
+
+请求：
+
+```json
+{
+  "policies": [
+    {
+      "model_id": null,
+      "hour_request_limit": 30,
+      "week_request_limit": 500,
+      "lifetime_request_limit": null,
+      "hour_token_limit": 200000,
+      "week_token_limit": 1000000,
+      "lifetime_token_limit": null,
+      "status": "active"
+    }
+  ]
+}
+```
+
+## 11.17 `PUT /api/v1/admin/users/:id/group`
+
+请求：
+
+```json
+{
+  "user_group_id": "uuid"
+}
+```
+
+## 11.18 `GET /api/v1/admin/users/:id/limit-usage`
+
+查询参数：
+
+- `model_id`：可选；为空时按全部模型汇总
+
+响应要点：
+
+- 返回 `effective_policy`
+- 返回 `usage.hour/week/lifetime`
+- 返回 `adjustments.hour/week/lifetime`
+- 返回 `remaining.hour/week/lifetime`
+
+## 11.19 `GET /api/v1/admin/users/:id/limit-adjustments`
+
+查询参数：
+
+- `page`
+- `page_size`
+- `model_id`
+
+## 11.20 `POST /api/v1/admin/users/:id/limit-adjustments`
+
+请求：
+
+```json
+{
+  "model_id": null,
+  "metric_type": "request_count",
+  "window_type": "rolling_hour",
+  "delta": 10,
+  "reason": "support grant"
+}
+```
+
+## 11.21 `POST /api/v1/admin/redeem-codes/batch`
 
 请求：
 
@@ -730,11 +908,11 @@ data: [DONE]
 }
 ```
 
-## 11.10 `GET /api/v1/admin/redeem-codes`
+## 11.22 `GET /api/v1/admin/redeem-codes`
 
 - 返回兑换码批次与统计信息
 
-## 11.11 `GET /api/v1/admin/audit-logs`
+## 11.23 `GET /api/v1/admin/audit-logs`
 
 查询参数：
 
@@ -745,11 +923,11 @@ data: [DONE]
 - `resource_type`
 - `result`
 
-## 11.12 `GET /api/v1/admin/service-entries`（P1）
+## 11.24 `GET /api/v1/admin/service-entries`（P1）
 
 - 返回服务入口配置列表
 
-## 11.13 `POST /api/v1/admin/service-entries`（P1）
+## 11.25 `POST /api/v1/admin/service-entries`（P1）
 
 请求：
 
@@ -759,12 +937,12 @@ data: [DONE]
   "slug": "grok-mirror",
   "entry_url": "https://service.example.com",
   "launch_mode": "iframe",
-  "allowed_group_ids": ["uuid"],
+  "visible_user_group_ids": ["uuid"],
   "status": "active"
 }
 ```
 
-## 11.14 `PUT /api/v1/admin/service-entries/:id`（P1）
+## 11.26 `PUT /api/v1/admin/service-entries/:id`（P1）
 
 - 用于修改地址、模式、状态和可见组
 
@@ -783,6 +961,7 @@ data: [DONE]
 - `CHAT_UPSTREAM_UNAVAILABLE`
 - `CHAT_STREAM_ABORTED`
 - `CHAT_CONTEXT_INVALID`
+- `CHAT_LIMIT_EXCEEDED`
 
 ### 12.3 Billing
 
