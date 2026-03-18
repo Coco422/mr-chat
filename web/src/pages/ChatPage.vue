@@ -1165,14 +1165,33 @@ function deleteMessage(messageID: string) {
 }
 
 :global(.chat-model-popper.el-popper) {
+  --el-bg-color-overlay: var(--bg-secondary);
+  --el-fill-color-blank: var(--bg-secondary);
+  --el-fill-color-light: var(--surface-muted);
+  --el-fill-color-lightest: var(--surface-subtle);
+  --el-border-color-light: var(--glass-border);
+  --el-text-color-regular: var(--text-primary);
+  --el-text-color-placeholder: var(--text-secondary);
+  --el-color-primary: var(--accent-primary);
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--glass-border);
+  background: var(--bg-secondary);
   box-shadow: var(--shadow-md);
+}
+
+:global(.chat-model-popper .el-select-dropdown) {
+  background: var(--bg-secondary);
+}
+
+:global(.chat-model-popper .el-popper__arrow::before) {
+  background: var(--bg-secondary);
+  border-color: var(--glass-border);
 }
 
 :global(.chat-model-popper .el-select-dropdown__wrap) {
   padding: 0.22rem;
+  background: var(--bg-secondary);
 }
 
 :global(.chat-model-popper .el-select-dropdown__item) {
@@ -1181,6 +1200,7 @@ function deleteMessage(messageID: string) {
   line-height: 1.3;
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
+  color: var(--text-primary);
 }
 
 :global(.chat-model-popper .el-select-dropdown__item.is-hovering) {
@@ -1189,6 +1209,7 @@ function deleteMessage(messageID: string) {
 
 :global(.chat-model-popper .el-select-dropdown__item.is-selected) {
   background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-secondary));
+  color: var(--text-primary);
 }
 
 :deep(.markdown-body) {
