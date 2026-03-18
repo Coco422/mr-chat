@@ -94,7 +94,7 @@ export async function updateAdminUserGroup(accessToken: string, userID: string, 
     method: 'PUT',
     accessToken,
     body: {
-      user_group_id: userGroupID
+      user_group_id: userGroupID 
     }
   })
 }
