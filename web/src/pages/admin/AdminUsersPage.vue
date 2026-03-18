@@ -1,7 +1,10 @@
 <template>
-  <section>
-    <h1>Users</h1>
-    <p v-if="errorMessage">{{ errorMessage }}</p>
+  <div class="admin-page">
+    <div class="page-header">
+      <h1>用户管理</h1>
+    </div>
+
+    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
     <form @submit.prevent="loadUsers">
       <div>
@@ -410,3 +413,48 @@ function toErrorMessage(error: unknown) {
   return '请求失败'
 }
 </script>
+
+<style scoped>
+@import '@/styles/admin.css';
+
+.inline-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.small-input {
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  width: 80px;
+}
+
+.small-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.small-btn {
+  padding: 0.5rem 0.75rem;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.small-btn:hover:not(:disabled) {
+  background: var(--accent-secondary);
+}
+
+.small-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</style>

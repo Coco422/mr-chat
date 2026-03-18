@@ -1,7 +1,13 @@
 <template>
-  <section>
-    <h1>Models</h1>
-    <p v-if="errorMessage">{{ errorMessage }}</p>
+  <div class="admin-page">
+    <div class="page-header">
+      <h1>模型管理</h1>
+      <button class="primary-btn" @click="showForm = !showForm">
+        {{ showForm ? '取消' : '+ 新建模型' }}
+      </button>
+    </div>
+
+    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
     <form @submit.prevent="createModel">
       <div>
@@ -136,6 +142,7 @@ const auth = useAuthStore()
 const loading = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
+const showForm = ref(false)
 const upstreams = ref<UpstreamItem[]>([])
 const channels = ref<ChannelItem[]>([])
 const userGroups = ref<UserGroupItem[]>([])
@@ -250,3 +257,17 @@ function toErrorMessage(error: unknown) {
   return '请求失败'
 }
 </script>
+
+<style scoped>
+@import '@/styles/admin.css';
+
+.binding-tag {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: var(--input-bg);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-right: 0.5rem;
+}
+</style>
