@@ -44,6 +44,10 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) DB() *gorm.DB {
+	return r.db
+}
+
 func (r *Repository) ListConversations(ctx context.Context, filter ListConversationsFilter) (ConversationList, error) {
 	query := r.db.WithContext(ctx).Model(&Conversation{}).
 		Where("user_id = ?", filter.UserID).
@@ -157,6 +161,23 @@ func (r *Repository) ListMessages(ctx context.Context, userID, conversationID st
 		Items: items,
 		Total: total,
 	}, nil
+}
+
+func (r *Repository) ListAllMessages(ctx context.Context, userID, conversationID string) ([]Message, error) {
+	if _, err := r.getConversation(ctx, userID, conversationID); err != nil {
+		return nil, err
+	}
+
+	var items []Message
+	if err := r.db.WithContext(ctx).
+		Where("conversation_id = ?", conversationID).
+		Where("deleted_at IS NULL").
+		Order("created_at ASC").
+		Find(&items).Error; err != nil {
+		return nil, fmt.Errorf("list all messages: %w", err)
+	}
+
+	return items, nil
 }
 
 func (r *Repository) getConversation(ctx context.Context, userID, conversationID string) (*Conversation, error) {

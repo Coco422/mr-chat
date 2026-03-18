@@ -1,0 +1,1582 @@
+basePath: /api/v1
+definitions:
+  account.UserSettings:
+    properties:
+      locale:
+        type: string
+      timezone:
+        type: string
+    type: object
+  admin.assignUserGroupRequest:
+    properties:
+      user_group_id:
+        type: string
+    type: object
+  admin.channelRequest:
+    properties:
+      billing_config:
+        additionalProperties: {}
+        type: object
+      description:
+        type: string
+      metadata:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      status:
+        type: string
+    type: object
+  admin.modelRequest:
+    properties:
+      capabilities:
+        additionalProperties: {}
+        type: object
+      context_length:
+        type: integer
+      display_name:
+        type: string
+      max_output_tokens:
+        type: integer
+      metadata:
+        additionalProperties: {}
+        type: object
+      model_key:
+        type: string
+      pricing:
+        additionalProperties: {}
+        type: object
+      provider_type:
+        type: string
+      route_bindings:
+        items:
+          $ref: '#/definitions/catalog.RouteBindingInput'
+        type: array
+      status:
+        type: string
+      visible_user_group_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  admin.policyRequest:
+    properties:
+      hour_request_limit:
+        type: integer
+      hour_token_limit:
+        type: integer
+      lifetime_request_limit:
+        type: integer
+      lifetime_token_limit:
+        type: integer
+      model_id:
+        type: string
+      status:
+        type: string
+      week_request_limit:
+        type: integer
+      week_token_limit:
+        type: integer
+    type: object
+  admin.quotaAdjustmentRequest:
+    properties:
+      delta:
+        type: integer
+      reason:
+        type: string
+    type: object
+  admin.replacePoliciesRequest:
+    properties:
+      policies:
+        items:
+          $ref: '#/definitions/admin.policyRequest'
+        type: array
+    type: object
+  admin.upstreamRequest:
+    properties:
+      auth_config:
+        additionalProperties: {}
+        type: object
+      auth_type:
+        type: string
+      base_url:
+        type: string
+      cooldown_seconds:
+        type: integer
+      failure_threshold:
+        type: integer
+      metadata:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      provider_type:
+        type: string
+      status:
+        type: string
+      timeout_seconds:
+        type: integer
+    type: object
+  admin.userGroupRequest:
+    properties:
+      description:
+        type: string
+      metadata:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      permissions:
+        additionalProperties: {}
+        type: object
+      status:
+        type: string
+    type: object
+  admin.userLimitAdjustmentRequest:
+    properties:
+      delta:
+        type: integer
+      metric_type:
+        type: string
+      model_id:
+        type: string
+      reason:
+        type: string
+      window_type:
+        type: string
+    type: object
+  auth.signinRequest:
+    properties:
+      identifier:
+        type: string
+      password:
+        type: string
+    required:
+    - identifier
+    - password
+    type: object
+  auth.signupRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  catalog.RouteBindingInput:
+    properties:
+      channel_id:
+        type: string
+      priority:
+        type: integer
+      status:
+        type: string
+      upstream_id:
+        type: string
+    type: object
+  chat.completionMessageRequest:
+    properties:
+      content:
+        type: string
+      role:
+        type: string
+    type: object
+  chat.createCompletionRequest:
+    properties:
+      conversation_id:
+        type: string
+      max_tokens:
+        type: integer
+      messages:
+        items:
+          $ref: '#/definitions/chat.completionMessageRequest'
+        type: array
+      metadata:
+        additionalProperties: {}
+        type: object
+      model_id:
+        type: string
+      stream:
+        type: boolean
+    type: object
+  chat.createConversationRequest:
+    properties:
+      model_id:
+        type: string
+      title:
+        type: string
+    type: object
+  chat.updateConversationRequest:
+    properties:
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  httpx.Envelope:
+    properties:
+      data: {}
+      error:
+        $ref: '#/definitions/httpx.ErrorBody'
+      meta: {}
+      request_id:
+        type: string
+      success:
+        type: boolean
+    type: object
+  httpx.ErrorBody:
+    properties:
+      code:
+        type: string
+      details: {}
+      message:
+        type: string
+    type: object
+  users.changePasswordRequest:
+    properties:
+      current_password:
+        type: string
+      new_password:
+        type: string
+    required:
+    - current_password
+    - new_password
+    type: object
+  users.updateProfileRequest:
+    properties:
+      avatar_url:
+        type: string
+      display_name:
+        type: string
+      settings:
+        $ref: '#/definitions/account.UserSettings'
+    type: object
+info:
+  contact: {}
+  description: MrChat backend API for auth, user settings, chat completions, billing,
+    and admin configuration. Swagger UI is exposed at /swagger/index.html.
+  title: MrChat API
+  version: "0.1"
+paths:
+  /admin/audit-logs:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Actor user ID
+        in: query
+        name: actor_id
+        type: string
+      - description: Action
+        in: query
+        name: action
+        type: string
+      - description: Resource type
+        in: query
+        name: resource_type
+        type: string
+      - description: Result
+        in: query
+        name: result
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List audit logs
+      tags:
+      - Admin
+  /admin/channels:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List channels
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Channel payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.channelRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Create channel
+      tags:
+      - Admin
+  /admin/channels/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Channel ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Channel payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.channelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Update channel
+      tags:
+      - Admin
+  /admin/models:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List admin models
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Model payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.modelRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Create model
+      tags:
+      - Admin
+  /admin/models/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Model ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Model payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.modelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Update model
+      tags:
+      - Admin
+  /admin/upstreams:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List upstreams
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Upstream payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.upstreamRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Create upstream
+      tags:
+      - Admin
+  /admin/upstreams/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Upstream ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Upstream payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.upstreamRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Update upstream
+      tags:
+      - Admin
+  /admin/user-groups:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List user groups
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User group payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.userGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Create user group
+      tags:
+      - Admin
+  /admin/user-groups/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: User group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User group payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.userGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Update user group
+      tags:
+      - Admin
+  /admin/user-groups/{id}/limits:
+    get:
+      parameters:
+      - description: User group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get user group limit policies
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: User group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Policy payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.replacePoliciesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Replace user group limit policies
+      tags:
+      - Admin
+  /admin/users:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Keyword
+        in: query
+        name: keyword
+        type: string
+      - description: User status
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - Admin
+  /admin/users/{id}/group:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Assign user group payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.assignUserGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Assign user group
+      tags:
+      - Admin
+  /admin/users/{id}/limit-adjustments:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Model ID
+        in: query
+        name: model_id
+        type: string
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List user limit adjustments
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User limit adjustment payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.userLimitAdjustmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Create user limit adjustment
+      tags:
+      - Admin
+  /admin/users/{id}/limit-usage:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Model ID
+        in: query
+        name: model_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get user limit usage
+      tags:
+      - Admin
+  /admin/users/{id}/quota:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Quota adjustment payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.quotaAdjustmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Adjust user quota
+      tags:
+      - Admin
+  /auth/refresh:
+    post:
+      description: Refresh access token by refresh cookie
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      summary: Refresh access token
+      tags:
+      - Auth
+  /auth/signin:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate by username or email and issue access/refresh tokens
+      parameters:
+      - description: Signin payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.signinRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      summary: Sign in
+      tags:
+      - Auth
+  /auth/signout:
+    post:
+      description: Clear refresh cookie for current client
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      summary: Sign out
+      tags:
+      - Auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account and issue access/refresh tokens
+      parameters:
+      - description: Signup payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.signupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      summary: Sign up
+      tags:
+      - Auth
+  /billing/logs:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Billing log type
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List billing logs
+      tags:
+      - Billing
+  /billing/summary:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get billing summary
+      tags:
+      - Billing
+  /chat/completions:
+    post:
+      consumes:
+      - application/json
+      description: Main chat entry. `stream=false` returns JSON. `stream=true` returns
+        `text/event-stream` SSE events with `response.start`, `response.delta`, `reasoning.delta`,
+        `response.completed`, `response.failed`, and `[DONE]`.
+      parameters:
+      - description: Chat completion payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/chat.createCompletionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Create chat completion
+      tags:
+      - Chat
+  /conversations:
+    get:
+      parameters:
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - description: Conversation status
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List conversations
+      tags:
+      - Chat
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Conversation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/chat.createConversationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Create conversation
+      tags:
+      - Chat
+  /conversations/{id}:
+    delete:
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Delete conversation
+      tags:
+      - Chat
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/chat.updateConversationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Update conversation title
+      tags:
+      - Chat
+  /conversations/{id}/messages:
+    get:
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List conversation messages
+      tags:
+      - Chat
+  /health:
+    get:
+      description: Return current service, database, and redis availability
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      summary: Health check
+      tags:
+      - Health
+  /models:
+    get:
+      description: Return models visible to current user according to user group visibility
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: List visible models
+      tags:
+      - Catalog
+  /users/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get current user profile
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/users.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Update current user profile
+      tags:
+      - Users
+  /users/me/password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Password payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/users.changePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Change current user password
+      tags:
+      - Users
+  /users/me/quota:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get current user quota
+      tags:
+      - Users
+  /users/me/security:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get current user security info
+      tags:
+      - Users
+  /users/me/usage:
+    get:
+      parameters:
+      - description: Usage range
+        enum:
+        - 7d
+        - 30d
+        - month
+        in: query
+        name: range
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get current user usage
+      tags:
+      - Users
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: Enter access token as `Bearer <token>`.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

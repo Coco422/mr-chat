@@ -13,6 +13,7 @@
 ### 2.1 基础路径
 
 - 所有业务 API 统一挂在 `/api/v1`
+- 开发联调时可通过 `/swagger/index.html` 查看当前运行服务生成的 Swagger UI
 
 ### 2.2 鉴权
 
@@ -527,7 +528,7 @@
 
 ## 8.1 `POST /api/v1/chat/completions`
 
-这是用户侧主聊天入口，支持非流式与流式。
+这是用户侧主聊天入口。当前实现已经支持非流式和 `stream=true` 的 SSE 流式请求。
 
 请求：
 
@@ -535,7 +536,7 @@
 {
   "conversation_id": "uuid",
   "model_id": "uuid",
-  "stream": true,
+  "stream": false,
   "messages": [
     {
       "role": "user",
@@ -551,8 +552,10 @@
 约束：
 
 - `conversation_id` 可为空；为空时服务端创建新会话
+- `model_id` 当前为必填；若传已有 `conversation_id` 且该会话已绑定模型，则服务端可回退使用会话上的模型
 - `messages` 至少包含 1 条新的 user 消息
 - 对于已有会话，前端可以只传本次新增消息；服务端负责结合持久化历史重建上下文
+- 当前服务端会先做用户分组 + 模型限额校验，再按数据库中的 `route_bindings -> upstream` 配置发起 OpenAI 兼容请求
 
 ### 非流式响应
 
@@ -581,6 +584,24 @@
 }
 ```
 
+### 当前已实现行为
+
+- 非流式请求会：
+  - 校验模型可见性
+  - 读取当前用户的有效限额模板与直接调整值
+  - 结合历史消息重建上游上下文
+  - 按数据库里的上游和路由绑定发起 OpenAI 兼容请求
+  - 持久化 user/assistant 消息
+  - 落库 `llm_request_logs`
+- 流式请求会：
+  - 在校验通过后立即返回 `text/event-stream`
+  - 先发送 `response.start`
+  - 按上游增量分别透传 `response.delta.content` 与 `reasoning.delta.reasoning_content`
+  - 完成后发送 `response.completed` 和 `data: [DONE]`
+  - 客户端主动断开时中止上游请求，并把消息与 `llm_request_logs` 标记为取消
+- 账本结算字段当前固定返回 `0`，后续由 `BILL-BE-01` 接入
+- 某些推理模型可能返回 `reasoning_content` 但 `content` 为空；前端需要同时兼容这两个字段
+
 ### 流式响应
 
 响应头：
@@ -588,6 +609,7 @@
 - `Content-Type: text/event-stream`
 - `Cache-Control: no-cache`
 - `Connection: keep-alive`
+- 如果在发出任何 SSE 事件之前就校验失败，则仍返回标准 JSON 错误包，而不是事件流
 
 事件格式：
 
@@ -615,14 +637,14 @@ data: {"type":"reasoning.delta","delta":{"reasoning_content":"thinking..."}}
 #### `response.completed`
 
 ```text
-data: {"type":"response.completed","usage":{"prompt_tokens":120,"completion_tokens":80,"total_tokens":200},"billing":{"pre_deducted":300,"final_charged":200,"refunded":100},"finish_reason":"stop"}
+data: {"type":"response.completed","request_id":"req_123","conversation_id":"uuid","assistant_message_id":"uuid","usage":{"prompt_tokens":120,"completion_tokens":80,"total_tokens":200},"billing":{"pre_deducted":0,"final_charged":0,"refunded":0},"finish_reason":"stop"}
 
 ```
 
-#### `error`
+#### `response.failed`
 
 ```text
-data: {"type":"error","error":{"code":"CHAT_UPSTREAM_UNAVAILABLE","message":"Upstream unavailable"}}
+data: {"type":"response.failed","request_id":"req_123","conversation_id":"uuid","assistant_message_id":"uuid","error":{"code":"CHAT_UPSTREAM_UNAVAILABLE","message":"streaming failed"}}
 
 ```
 
@@ -636,7 +658,8 @@ data: [DONE]
 ### 停止生成
 
 - v0.1 以“客户端主动断开 SSE 连接”作为停止生成主机制
-- 服务端必须在连接断开后中止上游请求并进入结算/退款流程
+- 服务端当前已经在连接断开后中止上游请求，并把请求日志与消息状态更新为取消
+- 独立的 stop API 仍属于后续演进项
 
 ## 9. Billing API
 

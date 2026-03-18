@@ -81,6 +81,22 @@ func (s *Service) ListAdjustments(ctx context.Context, filter AdjustmentListFilt
 	return s.repo.ListAdjustments(ctx, filter)
 }
 
+func (s *Service) CreateRequestLog(ctx context.Context, input RequestLogCreateInput) (*LLMRequestLog, error) {
+	return s.repo.CreateRequestLog(ctx, input)
+}
+
+func (s *Service) CreateRequestLogWithDB(ctx context.Context, db *gorm.DB, input RequestLogCreateInput) (*LLMRequestLog, error) {
+	return s.repo.CreateRequestLogWithDB(ctx, db, input)
+}
+
+func (s *Service) UpdateRequestLogByRequestID(ctx context.Context, requestID string, input RequestLogUpdateInput) (*LLMRequestLog, error) {
+	return s.repo.UpdateRequestLogByRequestID(ctx, requestID, input)
+}
+
+func (s *Service) UpdateRequestLogByRequestIDWithDB(ctx context.Context, db *gorm.DB, requestID string, input RequestLogUpdateInput) (*LLMRequestLog, error) {
+	return s.repo.UpdateRequestLogByRequestIDWithDB(ctx, db, requestID, input)
+}
+
 func (s *Service) GetUserLimitUsage(ctx context.Context, userID string, modelID *string, now time.Time) (UsageReport, error) {
 	user, err := s.accountRepo.GetUserByID(ctx, userID)
 	if err != nil {
@@ -179,6 +195,10 @@ func RecordRejectedRequest(ctx context.Context, repo *Repository, requestID stri
 		Metadata:    metadata,
 	})
 	return err
+}
+
+func (s *Service) RecordRejectedRequest(ctx context.Context, requestID string, report UsageReport, errorCode string, metadata map[string]any) error {
+	return RecordRejectedRequest(ctx, s.repo, requestID, report, errorCode, metadata)
 }
 
 func toEffectivePolicy(policy *UserGroupModelLimitPolicy, modelID *string) EffectivePolicy {

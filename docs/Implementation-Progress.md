@@ -2,7 +2,7 @@
 
 - 状态：首轮实现进行中
 - 日期：2026-03-18
-- 当前阶段：`M0/M1` 已完成，`M2` 大部分已落地，`M3` 正在进入真实聊天能力实现
+- 当前阶段：`M0/M1` 已完成，`M2` 大部分已落地，`M3` 已接通首个真实上游并进入聊天闭环细化
 
 ## 1. 当前结论
 
@@ -13,7 +13,8 @@
 - 后端工程骨架、配置加载、goose 迁移入口、基础鉴权和用户中心 API 已可用
 - 核心表结构已经落到 PostgreSQL，并支持服务启动自动迁移
 - 管理侧已具备上游、渠道、模型、用户组、用户调额、用户限额调整、审计日志的首版 API
-- Chat 侧已具备模型列表、会话 CRUD、消息分页查询；限额引擎和请求日志结构已落地，但真实 `/chat/completions` 上游调用尚未接通
+- Chat 侧已具备模型列表、会话 CRUD、消息分页查询、非流式与 SSE `/chat/completions`、用户限额前置校验、消息持久化和 `llm_request_logs` 落库
+- Swagger UI 已接入，可直接通过 `/swagger/index.html` 查看当前接口
 - 前端已提供无样式联调壳子，可直接对接登录、设置、用量、Chat 和主要 Admin 页面
 
 ## 2. 已落地能力
@@ -54,6 +55,10 @@
   - `PUT /api/v1/conversations/:id`
   - `DELETE /api/v1/conversations/:id`
   - `GET /api/v1/conversations/:id/messages`
+  - `POST /api/v1/chat/completions`
+- Swagger
+  - `GET /swagger/index.html`
+  - `GET /swagger/doc.json`
 - Admin
   - `GET /api/v1/admin/upstreams`
   - `POST /api/v1/admin/upstreams`
@@ -100,15 +105,17 @@
 ### 3.1 命令级验证
 
 - `go test ./...` 通过
+- `pnpm install --frozen-lockfile` 已补齐前端依赖
 - `pnpm typecheck` 通过
 - `pnpm build` 通过
+- `make swagger` 能生成并更新 `internal/http/swagger/`
 - `go run ./cmd/migrate status` 能识别局域网 PostgreSQL 上的 pending migration
 - `go run ./cmd/migrate up` 已将局域网 PostgreSQL 升到 version `6`
 - `go run ./cmd/api` 启动时日志显示 `goose: no migrations to run. current version: 6`
 
-### 3.2 局域网 PostgreSQL 烟雾验证
+### 3.2 局域网 PostgreSQL 与 `newapi` 烟雾验证
 
-已在局域网 PostgreSQL 环境验证通过以下链路：
+已在局域网 PostgreSQL + 局域网 `newapi` 环境验证通过以下链路：
 
 - 新建临时 admin/user 测试账号
 - 提升测试 admin 角色后重新登录
@@ -121,15 +128,39 @@
 - Admin 查询该用户在指定模型下的 limit usage，返回 `policy_source = model_override`
 - Admin 创建单用户 direct adjustment，并能从调整列表和 audit logs 中查到
 - 普通用户重新拉取 `/models` 后，能看到被 user group 放行的模型
+- 普通用户通过 `POST /api/v1/chat/completions` 发起真实非流式请求，服务端按数据库中的 `upstream + channel + route_binding` 解析上游
+- 普通用户通过 `POST /api/v1/chat/completions` + `stream=true` 发起真实 SSE 请求，已收到 `response.start`、`reasoning.delta`、`response.completed` 和 `[DONE]`
+- 会话、消息、usage 和 `llm_request_logs` 已成功落库，`limit_usage` 已体现请求次数与 token 消耗增量
+- Chat 最小联调页已切到 `fetch + SSE`，并支持最基本的“停止生成”
 
 本轮烟雾验证的关键结果：
 
 - `policy_count = 2`
 - `policy_source = model_override`
-- `remaining_hour_requests = 10`
+- `visible_model_count >= 2`
+- `request_log_count = 3`
+- `latest_request_status = completed`
+- `latest_request_total_tokens = 539`
+- `stream_request_status = completed`
+- `stream_finish_reason = length`
+- `stream_total_tokens = 109`
+- `remaining_hour_requests = 2`
 - `adjustment_count = 1`
 - `model_visible = true`
 - `audit_total = 1`
+
+本轮用于真实联调的上游信息：
+
+- 上游类型：OpenAI 兼容接口
+- 目标服务：局域网 `newapi`
+- Base URL：`172.16.99.204:3398`
+- 当前验证到的可用模型：`Qwen/Qwen3.5-122B-A10B`
+
+当前已知现象：
+
+- 该上游在当前测试模型下会稳定返回 `reasoning_content`
+- 当 `max_tokens` 较小甚至较大时，响应可能在推理阶段被截断，出现 `finish_reason = length` 且 `content = ""`
+- 这不影响当前“路由 -> 请求 -> SSE -> 落库 -> 限额统计”闭环验证，但后续需要继续做模型参数策略和更细的前端 `reasoning_content` 展示优化
 
 ## 4. 当前任务映射
 
@@ -162,6 +193,8 @@
 - `MODEL-BE-01`
 - `CHAT-BE-01`
 - `CHAT-BE-02`
+- `CHAT-BE-03`
+- `CHAT-BE-05`
 
 ### 4.2 已进入开发，但还未完全达到原始清单定义
 
@@ -173,14 +206,22 @@
   - 已完成列表/创建/更新，删除与更细的资源管理尚未补齐
 - `ADMIN-BE-02`
   - 已完成列表/创建/更新与路由绑定保存，但更细的资源管理、删除与后续 P1 配置还未补齐
-- `CHAT-BE-03` ~ `CHAT-BE-08`
-  - 当前只到会话与消息读取层；真实上游调用、SSE、请求日志写入、usage 采集与结算闭环还在后续里程碑中
+- `CHAT-BE-04`
+  - 当前已按数据库配置选择可用 route binding 并完成单路由调用，但还没有真正做多上游故障切换、冷却窗口和 Redis 缓存
+- `CHAT-BE-05`
+  - 第一版已完成：非流式、SSE 和客户端断连取消均已打通；独立 stop API 与更细的前端交互仍待后续补强
+- `CHAT-BE-06`
+  - 已实现请求消息与 assistant 消息落库，但消息状态机和中断场景仍待扩展
+- `CHAT-BE-07`
+  - 已优先使用上游 usage，估算仅作为回退；尚未进入正式计费闭环
+- `CHAT-BE-08`
+  - `llm_request_logs` 已写入成功/失败/超限结果，但路由明细、聚合报表与更完整错误码体系仍待补齐
 
 ## 5. 下一步建议
 
 最顺的推进顺序现在是：
 
-1. 开始 `CHAT-BE-03`，先接通一个 OpenAI 兼容上游的非流式请求
-2. 紧接着推进 `CHAT-BE-05`，落第一版 `/api/v1/chat/completions`
-3. 把已完成的限额引擎和 `llm_request_logs` 正式接入聊天前置校验与请求结果落库
-4. 再进入 `CHAT-BE-04`、`CHAT-BE-07`、`CHAT-BE-08`，补路由、usage 回退和日志闭环
+1. 继续推进 `CHAT-BE-04`，补多上游 Failover、冷却与 Redis 缓存
+2. 完成 `CHAT-BE-07` + `BILL-BE-01`，把 usage 与计费账本打通
+3. 补强 `CHAT-BE-08` 的路由日志、错误码和报表聚合能力
+4. 继续完善前端对 `reasoning_content`、长流式消息和 stop 反馈的体验细节

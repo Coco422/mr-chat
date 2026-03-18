@@ -2,7 +2,7 @@
 
 - 状态：执行中
 - 日期：2026-03-18
-- 更新摘要：已补 `user_groups` / `channels` / limit policies / user adjustments / `llm_request_logs` 设计与首版实现
+- 更新摘要：已补 `user_groups` / `channels` / limit policies / user adjustments / `llm_request_logs` 设计与首版实现，并已接通首个基于数据库配置的 OpenAI 兼容上游、Swagger UI 与 `stream=true` SSE 主链路
 - 依赖文档：
   - `docs/Requirements-Baseline-v0.1.md`
   - `docs/Page-and-Route-Spec-v0.1.md`
@@ -22,7 +22,7 @@
   - `AUTH-FE-01`、`APP-FE-01`、`USER-FE-01`、`USER-FE-02`
   - `ADMIN-BE-03`、`ADMIN-BE-04`
   - `MODEL-BE-01`
-  - `CHAT-BE-01`、`CHAT-BE-02`
+  - `CHAT-BE-01`、`CHAT-BE-02`、`CHAT-BE-03`、`CHAT-BE-05`
   - `GROUP-BE-01`
   - `LIMIT-BE-01`
   - `LIMIT-BE-02`
@@ -38,7 +38,10 @@
 - 注册 / 登录 / 当前用户 / 个人设置 / 安全设置 / 用量页联调
 - Admin 上游 / 模型 / 用户调额 / 审计日志联调
 - Admin 渠道 / 用户组 / 分组限额 / 用户限额调整联调
+- Chat 非流式主链路联调：`/api/v1/chat/completions -> upstream -> messages -> llm_request_logs`
+- Chat 流式主链路联调：`/api/v1/chat/completions(stream=true) -> SSE -> messages -> llm_request_logs`
 - Chat 侧模型列表、会话 CRUD、消息列表联调
+- Swagger UI 联调入口：`/swagger/index.html`
 
 ## 1. 使用方式
 
@@ -144,12 +147,12 @@
 |---|---|---|---|---|---|---|
 | `CHAT-BE-01` | 实现会话 CRUD API | Backend | P0 | M | `DB-03`、`AUTH-BE-02` | 会话列表可按最近时间分页返回，并支持创建、重命名、软删 |
 | `CHAT-BE-02` | 实现消息列表 API | Backend | P0 | S | `DB-03`、`AUTH-BE-02` | 能分页返回消息 |
-| `CHAT-BE-03` | 实现 OpenAI 兼容上游客户端 | Backend | P0 | M | `ADMIN-BE-01` | 能调用一个上游完成非流式请求 |
+| `CHAT-BE-03` | 实现 OpenAI 兼容上游客户端 | Backend | P0 | M | `ADMIN-BE-01` | 已完成：可按数据库中的 upstream 配置调用一个 OpenAI 兼容上游完成非流式请求 |
 | `CHAT-BE-04` | 实现模型路由器、优先级 Failover 与上游冷却 | Backend | P0 | L | `CHAT-BE-03`、`ADMIN-BE-02`、`INF-08` | 故障时自动切换下一个上游，并按服务商记录失败次数与冷却状态；Redis 故障时退化为单实例内存冷却 |
-| `CHAT-BE-05` | 实现 Chat Completions 接口（SSE/非流式）与断连取消 | Backend | P0 | L | `CHAT-BE-03` | 同一入口支持流式/非流式，SSE 能稳定输出并响应 stop |
-| `CHAT-BE-06` | 实现消息持久化与状态流转 | Backend | P0 | M | `CHAT-BE-05`、`DB-03` | 消息状态可经历 `pending/streaming/completed/...` |
-| `CHAT-BE-07` | 实现 usage 采集与本地估算回退 | Backend | P0 | M | `CHAT-BE-05` | 上游无 usage 时仍可结算 |
-| `CHAT-BE-08` | 实现请求日志、路由日志、错误码收敛 | Backend | P0 | M | `INF-06`、`CHAT-BE-04` | `llm_request_logs` 可完整追踪一次聊天请求链路，并为 RPM/限额聚合提供数据源 |
+| `CHAT-BE-05` | 实现 Chat Completions 接口（SSE/非流式）与断连取消 | Backend | P0 | L | `CHAT-BE-03` | 已完成第一版：非流式与 SSE `POST /api/v1/chat/completions` 已可用，客户端断连可取消上游请求；独立 stop API 仍待后续演进 |
+| `CHAT-BE-06` | 实现消息持久化与状态流转 | Backend | P0 | M | `CHAT-BE-05`、`DB-03` | 部分完成：user/assistant 消息已落库，完整状态机仍待扩展 |
+| `CHAT-BE-07` | 实现 usage 采集与本地估算回退 | Backend | P0 | M | `CHAT-BE-05` | 部分完成：优先采用上游 usage，回退估算已接入但尚未进入结算闭环 |
+| `CHAT-BE-08` | 实现请求日志、路由日志、错误码收敛 | Backend | P0 | M | `INF-06`、`CHAT-BE-04` | 部分完成：`llm_request_logs` 已记录真实请求链路，路由日志与聚合报表待补齐 |
 
 ## 8. M4：Chat 前端闭环
 
@@ -271,8 +274,8 @@
 
 目标：
 
-- 一次完整的流式聊天跑通
-- 路由、日志、结算初步闭环
+- 一次完整的非流式聊天已跑通，并继续推进 SSE
+- 路由、日志、结算进一步闭环
 
 ### Sprint 4
 

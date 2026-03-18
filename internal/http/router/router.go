@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"mrchat/internal/app/config"
 	"mrchat/internal/http/middleware"
@@ -46,6 +48,7 @@ func New(
 	})
 
 	engine.GET("/healthz", healthHandler.Get)
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := engine.Group("/api/v1")
 	{
@@ -64,6 +67,7 @@ func New(
 			authorized.PUT("/conversations/:id", chatHandler.UpdateConversation)
 			authorized.DELETE("/conversations/:id", chatHandler.DeleteConversation)
 			authorized.GET("/conversations/:id/messages", chatHandler.ListMessages)
+			authorized.POST("/chat/completions", chatHandler.CreateCompletion)
 
 			authorized.GET("/users/me", userHandler.GetMe)
 			authorized.PUT("/users/me", userHandler.UpdateMe)

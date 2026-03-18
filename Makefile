@@ -2,7 +2,7 @@ APP_NAME ?= mrchat-api
 GOOSE ?= go run ./cmd/migrate
 POSTGRES_DSN ?= postgres://mrchat:mrchat@127.0.0.1:5432/mrchat?sslmode=disable
 
-.PHONY: compose-up compose-down api-run web-dev test fmt migrate-status migrate-up migrate-down
+.PHONY: compose-up compose-down api-run web-dev test fmt swagger migrate-status migrate-up migrate-down
 
 compose-up:
 	docker compose up -d
@@ -18,6 +18,9 @@ web-dev:
 
 fmt:
 	go fmt ./...
+
+swagger:
+	go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d cmd/api,internal -o internal/http/swagger --parseInternal
 
 test:
 	go test ./...

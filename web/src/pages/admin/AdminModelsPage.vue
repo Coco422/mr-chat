@@ -100,7 +100,7 @@
       </li>
     </ul>
     <p v-else>暂无模型</p>
-  </section>
+  </div>
 </template>
 
 <script setup lang="ts">

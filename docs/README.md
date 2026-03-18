@@ -19,6 +19,7 @@
 
 如果只想先看当前统一口径，建议先看：`docs/Requirements-Baseline-v0.1.md`。
 如果只想快速了解最新开发状态，可看：`docs/Implementation-Progress.md`。
+如果只想直接看当前可联调接口，可启动服务后访问：`/swagger/index.html`。
 如果只想快速对齐旧文档关系，可看：`docs/Current-Design-Summary.md`。
 MVP 上线范围草案见：`docs/MVP-v0.1-Scope.md`。
 

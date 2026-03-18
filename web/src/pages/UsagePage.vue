@@ -117,7 +117,7 @@ const billingSummary = ref<BillingSummaryResponse | null>(null)
 const billingLogs = ref<BillingLogItem[]>([])
 const logsMeta = ref<Record<string, unknown> | null>(null)
 
-const ranges = [
+const ranges: Array<{ value: '7d' | '30d' | 'month'; label: string }> = [
   { value: '7d', label: '最近7天' },
   { value: '30d', label: '最近30天' },
   { value: 'month', label: '本月' }

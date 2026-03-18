@@ -1,7 +1,7 @@
 # MrChat 本地开发说明
 
 - 状态：开发联调用
-- 日期：2026-03-17
+- 日期：2026-03-18
 
 ## 1. 目的
 
@@ -58,11 +58,14 @@ go run ./cmd/api
 - 服务启动时会自动执行 `db/migrations/` 下尚未应用的 goose SQL 迁移
 - 这样仍然是在使用 goose，只是执行入口从 CLI 改成了 Go 服务启动流程
 - 如果需要手工检查迁移状态，可直接运行 `go run ./cmd/migrate status` 或 `make migrate-status`
+- 如果需要刷新 Swagger 文档，可运行 `make swagger`
+- 启动成功后可访问 `http://127.0.0.1:8080/swagger/index.html`
 
 前端：
 
 ```bash
 cd web
+pnpm install
 pnpm dev
 ```
 
@@ -96,8 +99,25 @@ VITE_API_BASE_URL=http://127.0.0.1:8080
 - `/settings/profile` <-> `GET/PUT /api/v1/users/me`
 - `/settings/security` <-> `GET /api/v1/users/me/security`、`PUT /api/v1/users/me/password`
 - `/usage` <-> `GET /api/v1/users/me/quota`、`GET /api/v1/users/me/usage`、`GET /api/v1/billing/summary`、`GET /api/v1/billing/logs`
-- `/chat`、`/chat/:conversationId` <-> `GET /api/v1/models`、`GET/POST/PUT/DELETE /api/v1/conversations`、`GET /api/v1/conversations/:id/messages`
+- `/chat`、`/chat/:conversationId` <-> `GET /api/v1/models`、`GET/POST/PUT/DELETE /api/v1/conversations`、`GET /api/v1/conversations/:id/messages`、`POST /api/v1/chat/completions`
 - `/admin/upstreams` <-> `GET/POST/PUT /api/v1/admin/upstreams`
+- `/admin/channels` <-> `GET/POST/PUT /api/v1/admin/channels`
 - `/admin/models` <-> `GET/POST/PUT /api/v1/admin/models`
-- `/admin/users` <-> `GET /api/v1/admin/users`、`PUT /api/v1/admin/users/:id/quota`
+- `/admin/user-groups` <-> `GET/POST/PUT /api/v1/admin/user-groups`、`GET/PUT /api/v1/admin/user-groups/:id/limits`
+- `/admin/users` <-> `GET /api/v1/admin/users`、`PUT /api/v1/admin/users/:id/group`、`PUT /api/v1/admin/users/:id/quota`、`GET /api/v1/admin/users/:id/limit-usage`、`GET/POST /api/v1/admin/users/:id/limit-adjustments`
 - `/admin/audit-logs` <-> `GET /api/v1/admin/audit-logs`
+
+## 6. 当前真实聊天联调样例
+
+局域网内当前已验证过一个可用 OpenAI 兼容上游：
+
+- Service: `newapi`
+- Base URL: `172.16.99.204:3398`
+- API Key: `sk-AOI0QvWfyl9j66e4jN9HLGd8SE4kAqndX7sO404wqk0Hqve2`
+- 已确认可用模型：`Qwen/Qwen3.5-122B-A10B`
+
+说明：
+
+- 该上游不是写死在代码中，而是通过 `/api/v1/admin/upstreams`、`/api/v1/admin/channels`、`/api/v1/admin/models` 持久化配置到数据库
+- 当前每次聊天请求都会实时从数据库读取路由配置；Redis 缓存仍是后续优化项
+- 当前 `/api/v1/chat/completions` 已支持 `stream=true` 的 SSE 联调，事件包括 `response.start`、`response.delta`、`reasoning.delta`、`response.completed` 与 `[DONE]`

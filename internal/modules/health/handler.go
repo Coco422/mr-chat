@@ -25,6 +25,13 @@ func NewHandler(cfg config.Config, db *database.Client, cache *cache.Client) *Ha
 	}
 }
 
+// Get godoc
+// @Summary Health check
+// @Description Return current service, database, and redis availability
+// @Tags Health
+// @Produce json
+// @Success 200 {object} httpx.Envelope
+// @Router /health [get]
 func (h *Handler) Get(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, gin.H{
 		"status":      "ok",

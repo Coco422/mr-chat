@@ -76,6 +76,17 @@ type RequestLogCreateInput struct {
 	Metadata         map[string]any
 }
 
+type RequestLogUpdateInput struct {
+	PromptTokens     *int64
+	CompletionTokens *int64
+	TotalTokens      *int64
+	BilledQuota      *int64
+	Status           *RequestLogStatus
+	ErrorCode        *string
+	CompletedAt      *time.Time
+	Metadata         map[string]any
+}
+
 func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -262,6 +273,14 @@ func (r *Repository) GetAdjustmentUsage(ctx context.Context, userID string, mode
 }
 
 func (r *Repository) CreateRequestLog(ctx context.Context, input RequestLogCreateInput) (*LLMRequestLog, error) {
+	return r.CreateRequestLogWithDB(ctx, r.db, input)
+}
+
+func (r *Repository) CreateRequestLogWithDB(ctx context.Context, db *gorm.DB, input RequestLogCreateInput) (*LLMRequestLog, error) {
+	if db == nil {
+		db = r.db
+	}
+
 	item := &LLMRequestLog{
 		ID:               uuid.NewString(),
 		RequestID:        strings.TrimSpace(input.RequestID),
@@ -286,11 +305,74 @@ func (r *Repository) CreateRequestLog(ctx context.Context, input RequestLogCreat
 		item.StartedAt = time.Now().UTC()
 	}
 
-	if err := r.db.WithContext(ctx).Create(item).Error; err != nil {
+	if err := db.WithContext(ctx).Create(item).Error; err != nil {
 		return nil, fmt.Errorf("create llm request log: %w", err)
 	}
 
 	return item, nil
+}
+
+func (r *Repository) UpdateRequestLogByRequestID(ctx context.Context, requestID string, input RequestLogUpdateInput) (*LLMRequestLog, error) {
+	return r.UpdateRequestLogByRequestIDWithDB(ctx, r.db, requestID, input)
+}
+
+func (r *Repository) UpdateRequestLogByRequestIDWithDB(ctx context.Context, db *gorm.DB, requestID string, input RequestLogUpdateInput) (*LLMRequestLog, error) {
+	if db == nil {
+		db = r.db
+	}
+
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return nil, fmt.Errorf("request_id is required")
+	}
+
+	updates := map[string]any{}
+	if input.PromptTokens != nil {
+		updates["prompt_tokens"] = *input.PromptTokens
+	}
+	if input.CompletionTokens != nil {
+		updates["completion_tokens"] = *input.CompletionTokens
+	}
+	if input.TotalTokens != nil {
+		updates["total_tokens"] = *input.TotalTokens
+	}
+	if input.BilledQuota != nil {
+		updates["billed_quota"] = *input.BilledQuota
+	}
+	if input.Status != nil {
+		updates["status"] = *input.Status
+	}
+	if input.ErrorCode != nil {
+		updates["error_code"] = sanitizeOptionalString(input.ErrorCode)
+	}
+	if input.CompletedAt != nil {
+		updates["completed_at"] = input.CompletedAt.UTC()
+	}
+	if input.Metadata != nil {
+		updates["metadata_json"] = nonNilMap(input.Metadata)
+	}
+
+	if len(updates) == 0 {
+		var item LLMRequestLog
+		if err := db.WithContext(ctx).Where("request_id = ?", requestID).First(&item).Error; err != nil {
+			return nil, fmt.Errorf("get llm request log: %w", err)
+		}
+		return &item, nil
+	}
+
+	if err := db.WithContext(ctx).
+		Model(&LLMRequestLog{}).
+		Where("request_id = ?", requestID).
+		Updates(updates).Error; err != nil {
+		return nil, fmt.Errorf("update llm request log: %w", err)
+	}
+
+	var item LLMRequestLog
+	if err := db.WithContext(ctx).Where("request_id = ?", requestID).First(&item).Error; err != nil {
+		return nil, fmt.Errorf("get llm request log after update: %w", err)
+	}
+
+	return &item, nil
 }
 
 func (r *Repository) aggregateUsage(ctx context.Context, userID string, modelID *string, start *time.Time, end time.Time) (UsageCounter, error) {

@@ -100,6 +100,15 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+// ListUpstreams godoc
+// @Summary List upstreams
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/upstreams [get]
 func (h *Handler) ListUpstreams(c *gin.Context) {
 	items, err := h.service.ListUpstreams(c.Request.Context())
 	if err != nil {
@@ -109,6 +118,18 @@ func (h *Handler) ListUpstreams(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toUpstreams(items))
 }
 
+// CreateUpstream godoc
+// @Summary Create upstream
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body upstreamRequest true "Upstream payload"
+// @Success 201 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/upstreams [post]
 func (h *Handler) CreateUpstream(c *gin.Context) {
 	var req upstreamRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -125,6 +146,20 @@ func (h *Handler) CreateUpstream(c *gin.Context) {
 	httpx.Success(c, http.StatusCreated, toUpstream(item))
 }
 
+// UpdateUpstream godoc
+// @Summary Update upstream
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Upstream ID"
+// @Param request body upstreamRequest true "Upstream payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/upstreams/{id} [put]
 func (h *Handler) UpdateUpstream(c *gin.Context) {
 	var req upstreamRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -152,6 +187,15 @@ func (h *Handler) UpdateUpstream(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toUpstream(item))
 }
 
+// ListChannels godoc
+// @Summary List channels
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/channels [get]
 func (h *Handler) ListChannels(c *gin.Context) {
 	items, err := h.service.ListChannels(c.Request.Context())
 	if err != nil {
@@ -161,6 +205,18 @@ func (h *Handler) ListChannels(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toChannels(items))
 }
 
+// CreateChannel godoc
+// @Summary Create channel
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body channelRequest true "Channel payload"
+// @Success 201 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/channels [post]
 func (h *Handler) CreateChannel(c *gin.Context) {
 	var req channelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -183,6 +239,20 @@ func (h *Handler) CreateChannel(c *gin.Context) {
 	httpx.Success(c, http.StatusCreated, toChannel(item))
 }
 
+// UpdateChannel godoc
+// @Summary Update channel
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Channel ID"
+// @Param request body channelRequest true "Channel payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/channels/{id} [put]
 func (h *Handler) UpdateChannel(c *gin.Context) {
 	var req channelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -205,6 +275,15 @@ func (h *Handler) UpdateChannel(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toChannel(item))
 }
 
+// ListModels godoc
+// @Summary List admin models
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/models [get]
 func (h *Handler) ListModels(c *gin.Context) {
 	items, err := h.service.ListModels(c.Request.Context())
 	if err != nil {
@@ -214,6 +293,18 @@ func (h *Handler) ListModels(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toAdminModels(items))
 }
 
+// CreateModel godoc
+// @Summary Create model
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body modelRequest true "Model payload"
+// @Success 201 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/models [post]
 func (h *Handler) CreateModel(c *gin.Context) {
 	var req modelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -242,6 +333,20 @@ func (h *Handler) CreateModel(c *gin.Context) {
 	httpx.Success(c, http.StatusCreated, toAdminModel(*item))
 }
 
+// UpdateModel godoc
+// @Summary Update model
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Model ID"
+// @Param request body modelRequest true "Model payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/models/{id} [put]
 func (h *Handler) UpdateModel(c *gin.Context) {
 	var req modelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -270,6 +375,15 @@ func (h *Handler) UpdateModel(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toAdminModel(*item))
 }
 
+// ListUserGroups godoc
+// @Summary List user groups
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/user-groups [get]
 func (h *Handler) ListUserGroups(c *gin.Context) {
 	items, err := h.service.ListUserGroups(c.Request.Context())
 	if err != nil {
@@ -279,6 +393,18 @@ func (h *Handler) ListUserGroups(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toUserGroups(items))
 }
 
+// CreateUserGroup godoc
+// @Summary Create user group
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body userGroupRequest true "User group payload"
+// @Success 201 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/user-groups [post]
 func (h *Handler) CreateUserGroup(c *gin.Context) {
 	var req userGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -301,6 +427,20 @@ func (h *Handler) CreateUserGroup(c *gin.Context) {
 	httpx.Success(c, http.StatusCreated, toUserGroup(item))
 }
 
+// UpdateUserGroup godoc
+// @Summary Update user group
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User group ID"
+// @Param request body userGroupRequest true "User group payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/user-groups/{id} [put]
 func (h *Handler) UpdateUserGroup(c *gin.Context) {
 	var req userGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -324,6 +464,17 @@ func (h *Handler) UpdateUserGroup(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toUserGroup(item))
 }
 
+// GetUserGroupLimitPolicies godoc
+// @Summary Get user group limit policies
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User group ID"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/user-groups/{id}/limits [get]
 func (h *Handler) GetUserGroupLimitPolicies(c *gin.Context) {
 	items, err := h.service.ListUserGroupLimitPolicies(c.Request.Context(), c.Param("id"))
 	if err != nil {
@@ -333,6 +484,20 @@ func (h *Handler) GetUserGroupLimitPolicies(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toPolicies(items))
 }
 
+// UpdateUserGroupLimitPolicies godoc
+// @Summary Replace user group limit policies
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User group ID"
+// @Param request body replacePoliciesRequest true "Policy payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/user-groups/{id}/limits [put]
 func (h *Handler) UpdateUserGroupLimitPolicies(c *gin.Context) {
 	var req replacePoliciesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -363,6 +528,19 @@ func (h *Handler) UpdateUserGroupLimitPolicies(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toPolicies(items))
 }
 
+// ListUsers godoc
+// @Summary List users
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page"
+// @Param page_size query int false "Page size"
+// @Param keyword query string false "Keyword"
+// @Param status query string false "User status"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/users [get]
 func (h *Handler) ListUsers(c *gin.Context) {
 	page := parsePositiveInt(c.DefaultQuery("page", "1"), 1)
 	pageSize := parsePositiveInt(c.DefaultQuery("page_size", "20"), 20)
@@ -384,6 +562,20 @@ func (h *Handler) ListUsers(c *gin.Context) {
 	})
 }
 
+// AssignUserGroup godoc
+// @Summary Assign user group
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param request body assignUserGroupRequest true "Assign user group payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/users/{id}/group [put]
 func (h *Handler) AssignUserGroup(c *gin.Context) {
 	var req assignUserGroupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -400,6 +592,20 @@ func (h *Handler) AssignUserGroup(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toAdminUser(AdminUserRecord{User: *item}))
 }
 
+// AdjustUserQuota godoc
+// @Summary Adjust user quota
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param request body quotaAdjustmentRequest true "Quota adjustment payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/users/{id}/quota [put]
 func (h *Handler) AdjustUserQuota(c *gin.Context) {
 	var req quotaAdjustmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -416,6 +622,18 @@ func (h *Handler) AdjustUserQuota(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toAdminUser(AdminUserRecord{User: *item}))
 }
 
+// GetUserLimitUsage godoc
+// @Summary Get user limit usage
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param model_id query string false "Model ID"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/users/{id}/limit-usage [get]
 func (h *Handler) GetUserLimitUsage(c *gin.Context) {
 	modelID := optionalQueryString(c.Query("model_id"))
 	report, err := h.service.GetUserLimitUsage(c.Request.Context(), c.Param("id"), modelID)
@@ -427,6 +645,20 @@ func (h *Handler) GetUserLimitUsage(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, report)
 }
 
+// ListUserLimitAdjustments godoc
+// @Summary List user limit adjustments
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param model_id query string false "Model ID"
+// @Param page query int false "Page"
+// @Param page_size query int false "Page size"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/users/{id}/limit-adjustments [get]
 func (h *Handler) ListUserLimitAdjustments(c *gin.Context) {
 	page := parsePositiveInt(c.DefaultQuery("page", "1"), 1)
 	pageSize := parsePositiveInt(c.DefaultQuery("page_size", "20"), 20)
@@ -444,6 +676,20 @@ func (h *Handler) ListUserLimitAdjustments(c *gin.Context) {
 	})
 }
 
+// CreateUserLimitAdjustment godoc
+// @Summary Create user limit adjustment
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User ID"
+// @Param request body userLimitAdjustmentRequest true "User limit adjustment payload"
+// @Success 201 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/users/{id}/limit-adjustments [post]
 func (h *Handler) CreateUserLimitAdjustment(c *gin.Context) {
 	var req userLimitAdjustmentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -477,6 +723,21 @@ func (h *Handler) CreateUserLimitAdjustment(c *gin.Context) {
 	httpx.Success(c, http.StatusCreated, toUserLimitAdjustment(item))
 }
 
+// ListAuditLogs godoc
+// @Summary List audit logs
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page"
+// @Param page_size query int false "Page size"
+// @Param actor_id query string false "Actor user ID"
+// @Param action query string false "Action"
+// @Param resource_type query string false "Resource type"
+// @Param result query string false "Result"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/audit-logs [get]
 func (h *Handler) ListAuditLogs(c *gin.Context) {
 	page := parsePositiveInt(c.DefaultQuery("page", "1"), 1)
 	pageSize := parsePositiveInt(c.DefaultQuery("page_size", "20"), 20)

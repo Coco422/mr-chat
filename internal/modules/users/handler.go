@@ -30,6 +30,14 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+// GetMe godoc
+// @Summary Get current user profile
+// @Tags Users
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /users/me [get]
 func (h *Handler) GetMe(c *gin.Context) {
 	profile, err := h.service.GetMe(c.Request.Context(), middleware.CurrentUserID(c))
 	if err != nil {
@@ -40,6 +48,17 @@ func (h *Handler) GetMe(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, profile)
 }
 
+// UpdateMe godoc
+// @Summary Update current user profile
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body updateProfileRequest true "Profile payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /users/me [put]
 func (h *Handler) UpdateMe(c *gin.Context) {
 	var req updateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -56,6 +75,14 @@ func (h *Handler) UpdateMe(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, profile)
 }
 
+// GetQuota godoc
+// @Summary Get current user quota
+// @Tags Users
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /users/me/quota [get]
 func (h *Handler) GetQuota(c *gin.Context) {
 	quota, err := h.service.GetQuota(c.Request.Context(), middleware.CurrentUserID(c))
 	if err != nil {
@@ -66,6 +93,16 @@ func (h *Handler) GetQuota(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, quota)
 }
 
+// GetUsage godoc
+// @Summary Get current user usage
+// @Tags Users
+// @Produce json
+// @Security BearerAuth
+// @Param range query string false "Usage range" Enums(7d,30d,month)
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /users/me/usage [get]
 func (h *Handler) GetUsage(c *gin.Context) {
 	usage, err := h.service.GetUsage(c.Request.Context(), middleware.CurrentUserID(c), c.DefaultQuery("range", "7d"))
 	if err != nil {
@@ -76,6 +113,14 @@ func (h *Handler) GetUsage(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, usage)
 }
 
+// GetSecurity godoc
+// @Summary Get current user security info
+// @Tags Users
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /users/me/security [get]
 func (h *Handler) GetSecurity(c *gin.Context) {
 	security, err := h.service.GetSecurity(c.Request.Context(), middleware.CurrentUserID(c))
 	if err != nil {
@@ -86,6 +131,17 @@ func (h *Handler) GetSecurity(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, security)
 }
 
+// ChangePassword godoc
+// @Summary Change current user password
+// @Tags Users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body changePasswordRequest true "Password payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /users/me/password [put]
 func (h *Handler) ChangePassword(c *gin.Context) {
 	var req changePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

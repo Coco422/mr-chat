@@ -1,3 +1,12 @@
+// @title MrChat API
+// @version 0.1
+// @description MrChat backend API for auth, user settings, chat completions, billing, and admin configuration. Swagger UI is exposed at /swagger/index.html.
+// @BasePath /api/v1
+// @schemes http https
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter access token as `Bearer <token>`.
 package main
 
 import (
@@ -12,6 +21,7 @@ import (
 	"mrchat/internal/app/config"
 	"mrchat/internal/app/server"
 	"mrchat/internal/http/router"
+	_ "mrchat/internal/http/swagger"
 	"mrchat/internal/modules/account"
 	"mrchat/internal/modules/admin"
 	"mrchat/internal/modules/audit"
@@ -68,7 +78,7 @@ func main() {
 	billingService := billing.NewService(accountRepository)
 	catalogService := catalog.NewService(catalogRepository, accountRepository)
 	limitsService := limits.NewService(limitsRepository, accountRepository)
-	chatService := chat.NewService(chat.NewRepository(dbClient.DB))
+	chatService := chat.NewService(chat.NewRepository(dbClient.DB), accountRepository, catalogRepository, limitsService)
 	adminService := admin.NewService(accountRepository, catalogRepository, limitsService, auditRepository)
 
 	healthHandler := health.NewHandler(cfg, dbClient, redisClient)

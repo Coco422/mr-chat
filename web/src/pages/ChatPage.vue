@@ -1,93 +1,69 @@
 <template>
-  <div class="chat-page">
-    <div class="chat-header">
-      <div class="chat-title">
-        <h2>{{ currentConversation?.title || '新对话' }}</h2>
-        <span class="model-badge" v-if="currentConversation?.model_id">
-          {{ getModelName(currentConversation.model_id) }}
-        </span>
-      </div>
-      <button class="icon-btn" @click="reloadAll" :disabled="loading" title="刷新">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-      </button>
+  <section>
+    <h1>Chat</h1>
+    <p v-if="errorMessage">{{ errorMessage }}</p>
+
+    <div>
+      <button type="button" @click="reloadAll" :disabled="loading">刷新</button>
+      <button type="button" @click="stopStreaming" :disabled="!sending">停止生成</button>
     </div>
 
-    <div class="messages-container" ref="messagesContainer">
-      <div v-if="!currentConversationId" class="welcome-screen">
-        <div class="welcome-icon">
-          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-            <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="2" opacity="0.3"/>
-            <path d="M20 32 L28 24 L36 32 L44 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
-          </svg>
-        </div>
-        <h3>开始新对话</h3>
-        <p>选择一个模型开始聊天</p>
-        <div class="model-grid">
-          <button
-            v-for="model in models"
-            :key="model.id"
-            @click="startWithModel(model.id)"
-            class="model-card"
-          >
-            <div class="model-name">{{ model.display_name }}</div>
-            <div class="model-key">{{ model.model_key }}</div>
-          </button>
-        </div>
-      </div>
+    <hr />
 
-      <div v-else class="messages-list">
-        <div v-if="loadingMessages" class="loading-state">加载中...</div>
-        <div v-else-if="messages.length === 0" class="empty-messages">暂无消息</div>
-        <div v-else>
-          <div
-            v-for="message in messages"
-            :key="message.id"
-            class="message"
-            :class="{ user: message.role === 'user', assistant: message.role === 'assistant' }"
-          >
-            <div class="message-avatar">
-              {{ message.role === 'user' ? 'U' : 'A' }}
-            </div>
-            <div class="message-content">
-              <div class="message-text">{{ message.content }}</div>
-              <div class="message-time">{{ formatTime(message.created_at) }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div>
+      <label>
+        当前会话
+        <span>{{ currentConversationId || 'new' }}</span>
+      </label>
+    </div>
+    <div>
+      <label>
+        模型
+        <select v-model="selectedModelID">
+          <option value="">请选择模型</option>
+          <option v-for="model in models" :key="model.id" :value="model.id">
+            {{ model.display_name }} ({{ model.model_key }})
+          </option>
+        </select>
+      </label>
     </div>
 
-    <div class="input-area" v-if="currentConversationId">
-      <form @submit.prevent="sendMessage" class="input-form">
-        <textarea
-          v-model="inputMessage"
-          placeholder="输入消息..."
-          rows="1"
-          @keydown.enter.exact.prevent="sendMessage"
-        ></textarea>
-        <button type="submit" :disabled="!inputMessage.trim() || sending" class="send-btn">
-          <svg v-if="!sending" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-          </svg>
-          <span v-else class="spinner"></span>
-        </button>
+    <hr />
+
+    <section>
+      <h2>消息列表</h2>
+      <p v-if="loadingMessages">消息加载中...</p>
+      <ul v-else-if="messages.length > 0">
+        <li v-for="message in messages" :key="message.id">
+          <div>{{ message.role }} / {{ message.status }} / {{ message.created_at }}</div>
+          <div>{{ message.content }}</div>
+          <div v-if="message.reasoning_content">reasoning: {{ message.reasoning_content }}</div>
+          <div v-if="message.finish_reason">finish_reason: {{ message.finish_reason }}</div>
+        </li>
+      </ul>
+      <p v-else>暂无消息</p>
+    </section>
+
+    <hr />
+
+    <section>
+      <h2>发送消息</h2>
+      <form @submit.prevent="sendMessage">
+        <div>
+          <textarea v-model="inputMessage" rows="6" placeholder="输入消息..." />
+        </div>
+        <button type="submit" :disabled="sending || !inputMessage.trim()">发送</button>
       </form>
-    </div>
-  </div>
+    </section>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, nextTick } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { apiRequest, ApiError } from '@/lib/api'
-import { useAuthStore } from '@/stores/auth'
 
-const auth = useAuthStore()
-const route = useRoute()
-const router = useRouter()
+import { ApiError, apiBaseUrl, apiRequest } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 
 interface UserModel {
   id: string
@@ -108,18 +84,78 @@ interface MessageItem {
   id: string
   role: string
   content: string
+  reasoning_content: string
   status: string
+  finish_reason?: string | null
+  usage?: Record<string, unknown>
   created_at: string
 }
+
+interface StreamStartEvent {
+  type: 'response.start'
+  request_id: string
+  conversation_id: string
+  assistant_message_id: string
+}
+
+interface StreamDeltaEvent {
+  type: 'response.delta'
+  delta: {
+    content?: string
+  }
+}
+
+interface StreamReasoningEvent {
+  type: 'reasoning.delta'
+  delta: {
+    reasoning_content?: string
+  }
+}
+
+interface StreamCompletedEvent {
+  type: 'response.completed'
+  request_id?: string
+  conversation_id?: string
+  assistant_message_id?: string
+  finish_reason?: string
+  usage?: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
+}
+
+interface StreamFailedEvent {
+  type: 'response.failed'
+  request_id?: string
+  conversation_id?: string
+  assistant_message_id?: string
+  error?: {
+    code?: string
+    message?: string
+  }
+}
+
+type StreamEvent =
+  | StreamStartEvent
+  | StreamDeltaEvent
+  | StreamReasoningEvent
+  | StreamCompletedEvent
+  | StreamFailedEvent
+
+const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 
 const loading = ref(false)
 const loadingMessages = ref(false)
 const sending = ref(false)
+const errorMessage = ref('')
 const models = ref<UserModel[]>([])
+const conversations = ref<ConversationSummary[]>([])
 const messages = ref<MessageItem[]>([])
-const currentConversation = ref<ConversationSummary | null>(null)
-const inputMessage = ref('')
-const messagesContainer = ref<HTMLElement>()
+const selectedModelID = ref('')
+const streamAbortController = ref<AbortController | null>(null)
 
 const currentConversationId = computed(() =>
   typeof route.params.conversationId === 'string' ? route.params.conversationId : ''
@@ -129,361 +165,313 @@ onMounted(async () => {
   await reloadAll()
 })
 
-watch(currentConversationId, async (id) => {
-  if (!id) {
-    messages.value = []
-    currentConversation.value = null
+watch(currentConversationId, async () => {
+  if (sending.value) {
     return
   }
-  await loadMessages(id)
-}, { immediate: true })
+  await reloadAll()
+})
+
+const inputMessage = ref('')
 
 async function reloadAll() {
   loading.value = true
+  errorMessage.value = ''
+
   try {
-    const { data } = await apiRequest<UserModel[]>('/models', {
-      accessToken: auth.accessToken
-    })
-    models.value = data
+    const [modelsResponse, conversationsResponse] = await Promise.all([
+      apiRequest<UserModel[]>('/models', {
+        accessToken: auth.accessToken
+      }),
+      apiRequest<ConversationSummary[]>('/conversations', {
+        accessToken: auth.accessToken
+      })
+    ])
+
+    models.value = modelsResponse.data
+    conversations.value = conversationsResponse.data
+
+    const currentConversation = conversations.value.find((item) => item.id === currentConversationId.value) ?? null
+    if (currentConversation?.model_id) {
+      selectedModelID.value = currentConversation.model_id
+    } else if (!selectedModelID.value && models.value.length > 0) {
+      selectedModelID.value = models.value[0].id
+    }
+
+    if (currentConversationId.value) {
+      await loadMessages(currentConversationId.value)
+    } else {
+      messages.value = []
+    }
   } catch (error) {
-    console.error('Failed to load models:', error)
+    errorMessage.value = toErrorMessage(error)
   } finally {
     loading.value = false
   }
 }
 
-async function loadMessages(conversationId: string) {
+async function loadMessages(conversationID: string) {
   loadingMessages.value = true
+  errorMessage.value = ''
+
   try {
-    const { data } = await apiRequest<MessageItem[]>(`/conversations/${conversationId}/messages`, {
+    const { data } = await apiRequest<MessageItem[]>(`/conversations/${conversationID}/messages`, {
       accessToken: auth.accessToken
     })
     messages.value = data
-    await nextTick()
-    scrollToBottom()
   } catch (error) {
-    console.error('Failed to load messages:', error)
+    messages.value = []
+    errorMessage.value = toErrorMessage(error)
   } finally {
     loadingMessages.value = false
   }
 }
 
-async function startWithModel(modelId: string) {
-  try {
-    const { data } = await apiRequest<ConversationSummary>('/conversations', {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: { title: '新对话', model_id: modelId }
-    })
-    router.push(`/chat/${data.id}`)
-  } catch (error) {
-    console.error('Failed to create conversation:', error)
-  }
-}
-
 async function sendMessage() {
-  if (!inputMessage.value.trim() || sending.value) return
+  if (sending.value) {
+    return
+  }
+
+  const content = inputMessage.value.trim()
+  if (!content) {
+    return
+  }
+  if (!selectedModelID.value) {
+    errorMessage.value = '请先选择模型'
+    return
+  }
 
   sending.value = true
-  const content = inputMessage.value
+  errorMessage.value = ''
+  const controller = new AbortController()
+  streamAbortController.value = controller
+  const createdAt = new Date().toISOString()
+  const userTempID = `local-user-${Date.now()}`
+  let assistantMessageID = `local-assistant-${Date.now()}`
+  let nextConversationID = currentConversationId.value
+
+  messages.value = [
+    ...messages.value,
+    {
+      id: userTempID,
+      role: 'user',
+      content,
+      reasoning_content: '',
+      status: 'completed',
+      created_at: createdAt
+    },
+    {
+      id: assistantMessageID,
+      role: 'assistant',
+      content: '',
+      reasoning_content: '',
+      status: 'streaming',
+      finish_reason: null,
+      usage: {},
+      created_at: createdAt
+    }
+  ]
   inputMessage.value = ''
 
   try {
-    await apiRequest(`/conversations/${currentConversationId.value}/messages`, {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: { content }
-    })
-    await loadMessages(currentConversationId.value)
+    await streamChatCompletion(
+      {
+        conversation_id: currentConversationId.value || null,
+        model_id: selectedModelID.value,
+        stream: true,
+        messages: [
+          {
+            role: 'user',
+            content
+          }
+        ]
+      },
+      auth.accessToken,
+      controller.signal,
+      (event) => {
+        switch (event.type) {
+          case 'response.start':
+            nextConversationID = event.conversation_id
+            replaceMessageID(assistantMessageID, event.assistant_message_id)
+            assistantMessageID = event.assistant_message_id
+            break
+          case 'response.delta':
+            patchMessage(assistantMessageID, {
+              content: currentMessageValue(assistantMessageID, 'content') + (event.delta.content ?? ''),
+              status: 'streaming'
+            })
+            break
+          case 'reasoning.delta':
+            patchMessage(assistantMessageID, {
+              reasoning_content:
+                currentMessageValue(assistantMessageID, 'reasoning_content') + (event.delta.reasoning_content ?? ''),
+              status: 'streaming'
+            })
+            break
+          case 'response.completed':
+            patchMessage(assistantMessageID, {
+              status: 'completed',
+              finish_reason: event.finish_reason ?? null,
+              usage: event.usage ?? {}
+            })
+            break
+          case 'response.failed':
+            patchMessage(assistantMessageID, {
+              status: 'failed'
+            })
+            errorMessage.value = `${event.error?.code ?? 'CHAT_STREAM_FAILED'}: ${event.error?.message ?? 'Streaming failed'}`
+            break
+        }
+      }
+    )
+
+    window.dispatchEvent(new Event('mrchat:conversations:refresh'))
+    if (nextConversationID && nextConversationID !== currentConversationId.value) {
+      await router.push(`/chat/${nextConversationID}`)
+    }
+    await reloadAll()
   } catch (error) {
-    console.error('Failed to send message:', error)
-    inputMessage.value = content
+    if (isAbortError(error)) {
+      patchMessage(assistantMessageID, { status: 'cancelled' })
+      errorMessage.value = '已停止生成'
+    } else {
+      patchMessage(assistantMessageID, { status: 'failed' })
+      errorMessage.value = toErrorMessage(error)
+    }
+
+    if (nextConversationID && nextConversationID !== currentConversationId.value) {
+      await router.push(`/chat/${nextConversationID}`)
+    }
+    await reloadAll()
   } finally {
+    streamAbortController.value = null
     sending.value = false
   }
 }
 
-function getModelName(modelId: string) {
-  return models.value.find(m => m.id === modelId)?.display_name || 'Unknown'
+function stopStreaming() {
+  streamAbortController.value?.abort()
 }
 
-function formatTime(timestamp: string) {
-  return new Date(timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+function patchMessage(messageID: string, patch: Partial<MessageItem>) {
+  messages.value = messages.value.map((item) => (item.id === messageID ? { ...item, ...patch } : item))
 }
 
-function scrollToBottom() {
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+function replaceMessageID(currentID: string, nextID: string) {
+  messages.value = messages.value.map((item) => (item.id === currentID ? { ...item, id: nextID } : item))
+}
+
+function currentMessageValue(messageID: string, field: 'content' | 'reasoning_content') {
+  return messages.value.find((item) => item.id === messageID)?.[field] ?? ''
+}
+
+async function streamChatCompletion(
+  body: Record<string, unknown>,
+  accessToken: string,
+  signal: AbortSignal,
+  onEvent: (event: StreamEvent) => void
+) {
+  const response = await fetch(`${apiBaseUrl}/api/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      Accept: 'text/event-stream',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    },
+    credentials: 'include',
+    body: JSON.stringify(body),
+    signal
+  })
+
+  if (!response.ok || !response.body) {
+    throw await toStreamError(response)
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) {
+      break
+    }
+
+    buffer += decoder.decode(value, { stream: true })
+    const chunks = buffer.split('\n\n')
+    buffer = chunks.pop() ?? ''
+
+    for (const chunk of chunks) {
+      const event = parseSSEChunk(chunk)
+      if (event === '[DONE]') {
+        return
+      }
+      if (event) {
+        onEvent(event)
+      }
+    }
+  }
+
+  buffer += decoder.decode()
+  const lastEvent = parseSSEChunk(buffer)
+  if (lastEvent && lastEvent !== '[DONE]') {
+    onEvent(lastEvent)
   }
 }
+
+function parseSSEChunk(chunk: string): StreamEvent | '[DONE]' | null {
+  const lines = chunk
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('data:'))
+
+  if (lines.length === 0) {
+    return null
+  }
+
+  const payload = lines.map((line) => line.slice(5).trim()).join('\n')
+  if (!payload) {
+    return null
+  }
+  if (payload === '[DONE]') {
+    return '[DONE]'
+  }
+
+  return JSON.parse(payload) as StreamEvent
+}
+
+async function toStreamError(response: Response) {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (contentType.includes('application/json')) {
+    const payload = (await response.json()) as {
+      error?: {
+        code?: string
+        message?: string
+        details?: unknown
+      }
+    }
+    return new ApiError(
+      payload.error?.message ?? `Request failed with status ${response.status}`,
+      payload.error?.code ?? 'HTTP_ERROR',
+      response.status,
+      payload.error?.details
+    )
+  }
+
+  return new ApiError(`Request failed with status ${response.status}`, 'HTTP_ERROR', response.status)
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === 'AbortError'
+}
+
+function toErrorMessage(error: unknown) {
+  if (isAbortError(error)) {
+    return '已停止生成'
+  }
+  if (error instanceof ApiError) {
+    return `${error.code}: ${error.message}`
+  }
+  return '请求失败'
+}
 </script>
-
-<style scoped>
-.chat-page {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-primary);
-}
-
-.chat-header {
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--glass-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--bg-secondary);
-}
-
-.chat-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.chat-title h2 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.model-badge {
-  padding: 0.25rem 0.75rem;
-  background: var(--input-bg);
-  border-radius: 12px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: transparent;
-  border: 1px solid var(--glass-border);
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.icon-btn:hover:not(:disabled) {
-  background: var(--input-bg);
-  color: var(--text-primary);
-}
-
-.icon-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.messages-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1.5rem;
-}
-
-.welcome-screen {
-  max-width: 600px;
-  margin: 0 auto;
-  text-align: center;
-  padding: 3rem 1rem;
-}
-
-.welcome-icon {
-  color: var(--text-secondary);
-  margin-bottom: 1.5rem;
-}
-
-.welcome-screen h3 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0 0 0.5rem;
-}
-
-.welcome-screen p {
-  color: var(--text-secondary);
-  margin: 0 0 2rem;
-}
-
-.model-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.model-card {
-  padding: 1.25rem;
-  background: var(--input-bg);
-  border: 1px solid var(--input-border);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: left;
-}
-
-.model-card:hover {
-  border-color: var(--accent-primary);
-  transform: translateY(-2px);
-}
-
-.model-name {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
-}
-
-.model-key {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.messages-list {
-  max-width: 800px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.loading-state,
-.empty-messages {
-  text-align: center;
-  padding: 2rem;
-  color: var(--text-secondary);
-}
-
-.message {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.message-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 0.875rem;
-  flex-shrink: 0;
-}
-
-.message.user .message-avatar {
-  background: var(--accent-primary);
-  color: white;
-}
-
-.message.assistant .message-avatar {
-  background: var(--input-bg);
-  color: var(--text-primary);
-}
-
-.message-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.message-text {
-  padding: 0.875rem 1rem;
-  border-radius: 12px;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  color: var(--text-primary);
-  word-wrap: break-word;
-}
-
-.message.user .message-text {
-  background: var(--accent-primary);
-  color: white;
-}
-
-.message.assistant .message-text {
-  background: var(--input-bg);
-}
-
-.message-time {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-top: 0.5rem;
-  padding: 0 0.25rem;
-}
-
-.input-area {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid var(--glass-border);
-  background: var(--bg-secondary);
-}
-
-.input-form {
-  max-width: 800px;
-  margin: 0 auto;
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-end;
-}
-
-.input-form textarea {
-  flex: 1;
-  padding: 0.875rem 1rem;
-  background: var(--input-bg);
-  border: 2px solid var(--input-border);
-  border-radius: 12px;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  font-family: inherit;
-  resize: none;
-  max-height: 200px;
-  transition: all 0.2s ease;
-  outline: none;
-}
-
-.input-form textarea:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-
-.send-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--accent-primary);
-  border: none;
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.send-btn:hover:not(:disabled) {
-  background: var(--accent-secondary);
-  transform: translateY(-1px);
-}
-
-.send-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-</style>

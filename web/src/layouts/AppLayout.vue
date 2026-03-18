@@ -90,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
@@ -118,7 +118,12 @@ onMounted(async () => {
   if (auth.isAuthenticated && !auth.user) {
     await auth.fetchMe()
   }
+  window.addEventListener('mrchat:conversations:refresh', loadConversations)
   await loadConversations()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('mrchat:conversations:refresh', loadConversations)
 })
 
 async function loadConversations() {

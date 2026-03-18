@@ -19,6 +19,14 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+// GetSummary godoc
+// @Summary Get billing summary
+// @Tags Billing
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /billing/summary [get]
 func (h *Handler) GetSummary(c *gin.Context) {
 	summary, err := h.service.GetSummary(c.Request.Context(), middleware.CurrentUserID(c))
 	if err != nil {
@@ -29,6 +37,18 @@ func (h *Handler) GetSummary(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, summary)
 }
 
+// ListLogs godoc
+// @Summary List billing logs
+// @Tags Billing
+// @Produce json
+// @Security BearerAuth
+// @Param page query int false "Page"
+// @Param page_size query int false "Page size"
+// @Param type query string false "Billing log type"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /billing/logs [get]
 func (h *Handler) ListLogs(c *gin.Context) {
 	page := parsePositiveInt(c.DefaultQuery("page", "1"), 1)
 	pageSize := parsePositiveInt(c.DefaultQuery("page_size", "20"), 20)

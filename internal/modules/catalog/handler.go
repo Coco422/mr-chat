@@ -18,6 +18,15 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+// ListVisibleModels godoc
+// @Summary List visible models
+// @Description Return models visible to current user according to user group visibility
+// @Tags Catalog
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /models [get]
 func (h *Handler) ListVisibleModels(c *gin.Context) {
 	items, err := h.service.ListVisibleModels(c.Request.Context(), middleware.CurrentUserID(c))
 	if err != nil {

@@ -38,6 +38,17 @@ func NewHandler(cfg config.AuthConfig, service *Service) *Handler {
 	}
 }
 
+// SignUp godoc
+// @Summary Sign up
+// @Description Create a new user account and issue access/refresh tokens
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body signupRequest true "Signup payload"
+// @Success 201 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 409 {object} httpx.Envelope
+// @Router /auth/signup [post]
 func (h *Handler) SignUp(c *gin.Context) {
 	var req signupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -55,6 +66,17 @@ func (h *Handler) SignUp(c *gin.Context) {
 	httpx.Success(c, http.StatusCreated, session)
 }
 
+// SignIn godoc
+// @Summary Sign in
+// @Description Authenticate by username or email and issue access/refresh tokens
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body signinRequest true "Signin payload"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /auth/signin [post]
 func (h *Handler) SignIn(c *gin.Context) {
 	var req signinRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -72,6 +94,14 @@ func (h *Handler) SignIn(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, session)
 }
 
+// Refresh godoc
+// @Summary Refresh access token
+// @Description Refresh access token by refresh cookie
+// @Tags Auth
+// @Produce json
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Router /auth/refresh [post]
 func (h *Handler) Refresh(c *gin.Context) {
 	refreshToken, err := c.Cookie(h.cookieName)
 	if err != nil || refreshToken == "" {
@@ -93,6 +123,13 @@ func (h *Handler) Refresh(c *gin.Context) {
 	})
 }
 
+// SignOut godoc
+// @Summary Sign out
+// @Description Clear refresh cookie for current client
+// @Tags Auth
+// @Produce json
+// @Success 200 {object} httpx.Envelope
+// @Router /auth/signout [post]
 func (h *Handler) SignOut(c *gin.Context) {
 	h.clearRefreshCookie(c)
 	httpx.Success(c, http.StatusOK, gin.H{

@@ -123,7 +123,7 @@
       </li>
     </ul>
     <p v-else>暂无用户</p>
-  </section>
+  </div>
 </template>
 
 <script setup lang="ts">
