@@ -120,48 +120,48 @@ const router = createRouter({
 
 let refreshPromise: Promise<boolean> | null = null
 
-async function ensureSession(auth: ReturnType<typeof useAuthStore>) {
-  if (auth.isAuthenticated) {
-    return true
-  }
+// async function ensureSession(auth: ReturnType<typeof useAuthStore>) {
+//   if (auth.isAuthenticated) {
+//     return true
+//   }
 
-  if (!refreshPromise) {
-    refreshPromise = auth.refreshSession().finally(() => {
-      refreshPromise = null
-    })
-  }
+//   if (!refreshPromise) {
+//     refreshPromise = auth.refreshSession().finally(() => {
+//       refreshPromise = null
+//     })
+//   }
 
-  return refreshPromise
-}
+//   return refreshPromise
+// }
 
-router.beforeEach(async (to) => {
-  const auth = useAuthStore()
+// router.beforeEach(async (to) => {
+//   const auth = useAuthStore()
 
-  if (to.meta.guestOnly) {
-    const recovered = await ensureSession(auth)
-    if (recovered) {
-      return { name: 'chat' }
-    }
+//   if (to.meta.guestOnly) {
+//     const recovered = await ensureSession(auth)
+//     if (recovered) {
+//       return { name: 'chat' }
+//     }
 
-    return true
-  }
+//     return true
+//   }
 
-  if (to.meta.requiresAuth) {
-    const recovered = await ensureSession(auth)
-    if (!recovered) {
-      return { name: 'login' }
-    }
+//   if (to.meta.requiresAuth) {
+//     const recovered = await ensureSession(auth)
+//     if (!recovered) {
+//       return { name: 'login' }
+//     }
 
-    if (!auth.user) {
-      await auth.fetchMe().catch(() => null)
-    }
-  }
+//     if (!auth.user) {
+//       await auth.fetchMe().catch(() => null)
+//     }
+//   }
 
-  if (to.meta.adminOnly && !auth.isAdmin) {
-    return { name: 'forbidden' }
-  }
+//   if (to.meta.adminOnly && !auth.isAdmin) {
+//     return { name: 'forbidden' }
+//   }
 
-  return true
-})
+//   return true
+// })
 
 export default router

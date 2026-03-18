@@ -1,50 +1,64 @@
 <template>
-  <section>
-    <h1>Users</h1>
-    <p v-if="errorMessage">{{ errorMessage }}</p>
+  <div class="admin-page">
+    <div class="page-header">
+      <h1>用户管理</h1>
+    </div>
 
-    <form @submit.prevent="loadUsers">
-      <div>
-        <label>
-          Keyword
-          <input v-model.trim="filters.keyword" type="text" />
-        </label>
-      </div>
-      <div>
-        <label>
-          状态
-          <select v-model="filters.status">
-            <option value="">all</option>
-            <option value="active">active</option>
-            <option value="disabled">disabled</option>
-            <option value="pending">pending</option>
-          </select>
-        </label>
-      </div>
-      <button type="submit" :disabled="loading">查询</button>
-    </form>
+    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-    <hr />
+    <div class="form-card">
+      <form @submit.prevent="loadUsers" class="admin-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>关键词</label>
+            <input v-model.trim="filters.keyword" type="text" placeholder="用户名或邮箱" />
+          </div>
+          <div class="form-group">
+            <label>状态</label>
+            <el-select v-model="filters.status">
+              <el-option value="" label="全部" />
+              <el-option value="active" label="Active" />
+              <el-option value="disabled" label="Disabled" />
+              <el-option value="pending" label="Pending" />
+            </el-select>
+          </div>
+        </div>
+        <button type="submit" :disabled="loading" class="submit-btn">查询</button>
+      </form>
+    </div>
 
-    <p v-if="loading">加载中...</p>
-    <ul v-else-if="items.length > 0">
-      <li v-for="item in items" :key="item.id">
-        <div>{{ item.username }} / {{ item.email }} / {{ item.role }} / quota={{ item.quota }}</div>
-        <form @submit.prevent="adjustQuota(item.id)">
-          <label>
-            delta
-            <input v-model.trim="quotaDelta[item.id]" type="number" />
-          </label>
-          <label>
-            reason
-            <input v-model.trim="quotaReason[item.id]" type="text" />
-          </label>
-          <button type="submit" :disabled="submittingUserID === item.id">调额</button>
-        </form>
-      </li>
-    </ul>
-    <p v-else>暂无用户</p>
-  </section>
+    <div class="table-card">
+      <h2>用户列表</h2>
+      <p v-if="loading" class="loading">加载中...</p>
+      <table v-else-if="items.length > 0">
+        <thead>
+          <tr>
+            <th>用户名</th>
+            <th>邮箱</th>
+            <th>角色</th>
+            <th>额度</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in items" :key="item.id">
+            <td>{{ item.username }}</td>
+            <td>{{ item.email }}</td>
+            <td>{{ item.role }}</td>
+            <td>{{ item.quota }}</td>
+            <td>
+              <form @submit.prevent="adjustQuota(item.id)" class="inline-form">
+                <input v-model.trim="quotaDelta[item.id]" type="number" placeholder="变动" class="small-input" />
+                <input v-model.trim="quotaReason[item.id]" type="text" placeholder="原因" class="small-input" />
+                <button type="submit" :disabled="submittingUserID === item.id" class="small-btn">调额</button>
+              </form>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty">暂无用户</p>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -135,3 +149,48 @@ function toErrorMessage(error: unknown) {
   return '请求失败'
 }
 </script>
+
+<style scoped>
+@import '@/styles/admin.css';
+
+.inline-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.small-input {
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  width: 80px;
+}
+
+.small-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.small-btn {
+  padding: 0.5rem 0.75rem;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.small-btn:hover:not(:disabled) {
+  background: var(--accent-secondary);
+}
+
+.small-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</style>
