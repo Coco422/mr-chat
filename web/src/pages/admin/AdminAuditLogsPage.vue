@@ -32,30 +32,39 @@
 
     <div class="table-card">
       <h2>日志列表</h2>
-      <p v-if="loading" class="loading">加载中...</p>
-      <table v-else-if="items.length > 0">
-        <thead>
-          <tr>
-            <th>Action</th>
-            <th>Resource Type</th>
-            <th>Resource ID</th>
-            <th>Result</th>
-            <th>Actor</th>
-            <th>时间</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in items" :key="item.id">
-            <td>{{ item.action }}</td>
-            <td>{{ item.resource_type }}</td>
-            <td>{{ item.resource_id || '-' }}</td>
-            <td><span class="status-badge" :class="item.result">{{ item.result }}</span></td>
-            <td>{{ item.actor_user_id || '-' }}</td>
-            <td>{{ formatDate(item.created_at) }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <p v-else class="empty">暂无审计日志</p>
+      <el-table :data="items" v-loading="loading" stripe>
+        <el-table-column prop="action" label="Action" min-width="150" />
+        <el-table-column prop="resource_type" label="Resource Type" min-width="150" />
+        <el-table-column prop="resource_id" label="Resource ID" min-width="200">
+          <template #default="{ row }">{{ row.resource_id || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="result" label="Result" width="120">
+          <template #default="{ row }">
+            <span class="status-badge" :class="row.result">{{ row.result }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="actor_user_id" label="Actor" min-width="200">
+          <template #default="{ row }">{{ row.actor_user_id || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="时间" width="180">
+          <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无审计日志" />
+        </template>
+      </el-table>
+
+      <el-pagination
+        v-if="total > 0"
+        v-model:current-page="pagination.page"
+        v-model:page-size="pagination.pageSize"
+        :total="total"
+        :page-sizes="[20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="loadLogs"
+        @size-change="loadLogs"
+        style="margin-top: 16px; justify-content: flex-end"
+      />
     </div>
   </div>
 </template>
@@ -81,6 +90,11 @@ const auth = useAuthStore()
 const loading = ref(false)
 const errorMessage = ref('')
 const items = ref<AuditLogItem[]>([])
+const total = ref(0)
+const pagination = reactive({
+  page: 1,
+  pageSize: 50
+})
 const filters = reactive({
   action: '',
   resourceType: '',
@@ -97,8 +111,8 @@ async function loadLogs() {
 
   try {
     const params = new URLSearchParams({
-      page: '1',
-      page_size: '50'
+      page: String(pagination.page),
+      page_size: String(pagination.pageSize)
     })
     if (filters.action) {
       params.set('action', filters.action)
@@ -110,7 +124,9 @@ async function loadLogs() {
       params.set('result', filters.result)
     }
 
-    items.value = await listAdminAuditLogs<AuditLogItem[]>(auth.accessToken, params.toString())
+    const data = await listAdminAuditLogs<AuditLogItem[]>(auth.accessToken, params.toString())
+    items.value = data
+    total.value = data.length
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {

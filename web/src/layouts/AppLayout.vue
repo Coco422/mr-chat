@@ -62,24 +62,27 @@
             <div class="user-role">{{ auth.user.role }}</div>
           </div>
         </div>
-        <button class="icon-btn" @click="toggleTheme" title="切换主题">
-          <svg v-if="isDark()" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <circle cx="12" cy="12" r="5" stroke-width="2"/><line x1="12" y1="1" x2="12" y2="3" stroke-width="2"/>
-            <line x1="12" y1="21" x2="12" y2="23" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-width="2"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke-width="2"/>
-            <line x1="21" y1="12" x2="23" y2="12" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-width="2"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-width="2"/>
-          </svg>
-          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-width="2"/>
-          </svg>
-        </button>
-        <button class="icon-btn" @click="handleSignOut" title="退出登录">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke-width="2"/>
-            <line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/>
-          </svg>
-        </button>
+        <div class="footer-actions">
+          <button class="icon-btn" @click="toggleTheme" title="切换主题">
+            <svg v-if="isDark()" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="5" stroke-width="2"/><line x1="12" y1="1" x2="12" y2="3" stroke-width="2"/>
+              <line x1="12" y1="21" x2="12" y2="23" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-width="2"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke-width="2"/>
+              <line x1="21" y1="12" x2="23" y2="12" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-width="2"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-width="2"/>
+            </svg>
+            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-width="2"/>
+            </svg>
+          </button>
+          <button class="logout-btn" @click="handleSignOut" title="退出登录">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke-width="2"/>
+              <line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/>
+            </svg>
+            <span>退出登录</span>
+          </button>
+        </div>
       </div>
     </aside>
 
@@ -197,29 +200,38 @@ async function handleSignOut() {
 .conversations-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem;
+  padding: 0.8rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
 }
 
 .conversation-item {
   display: block;
-  padding: 0.875rem 1rem;
-  margin-bottom: 0.25rem;
-  border-radius: 8px;
+  padding: 0.95rem 1rem;
+  border-radius: 14px;
   text-decoration: none;
   color: var(--text-secondary);
   transition: all 0.2s ease;
   cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 82%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--input-bg) 62%, transparent), color-mix(in srgb, var(--bg-secondary) 88%, transparent));
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.03);
 }
 
 .conversation-item:hover {
-  background: var(--input-bg);
+  background: color-mix(in srgb, var(--accent-glow) 28%, var(--input-bg));
   color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 38%, var(--glass-border));
+  transform: translateY(-1px);
 }
 
 .conversation-item.active {
-  background: var(--input-bg);
+  background: color-mix(in srgb, var(--accent-glow) 40%, var(--input-bg));
   color: var(--text-primary);
-  border-left: 3px solid var(--accent-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, var(--glass-border));
+  box-shadow: inset 3px 0 0 var(--accent-primary), 0 12px 24px rgba(0, 0, 0, 0.05);
 }
 
 .conv-title {
@@ -276,7 +288,7 @@ async function handleSignOut() {
   border-top: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.8rem;
 }
 
 .user-info {
@@ -333,6 +345,32 @@ async function handleSignOut() {
 }
 
 .icon-btn:hover {
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.logout-btn {
+  height: 36px;
+  padding: 0 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.logout-btn:hover {
   background: var(--input-bg);
   color: var(--text-primary);
 }
