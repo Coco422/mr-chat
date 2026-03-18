@@ -6,123 +6,145 @@
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-    <form @submit.prevent="loadUsers">
-      <div>
-        <label>
-          Keyword
-          <input v-model.trim="filters.keyword" type="text" />
-        </label>
-      </div>
-      <div>
-        <label>
-          状态
-          <select v-model="filters.status">
-            <option value="">all</option>
-            <option value="active">active</option>
-            <option value="disabled">disabled</option>
-            <option value="pending">pending</option>
-          </select>
-        </label>
-      </div>
-      <button type="submit" :disabled="loading">查询</button>
-    </form>
+    <div class="form-card">
+      <h2>筛选条件</h2>
+      <form @submit.prevent="loadUsers" class="admin-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Keyword</label>
+            <input v-model.trim="filters.keyword" type="text" />
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <el-select v-model="filters.status" style="width: 100%">
+              <el-option value="" label="all" />
+              <el-option value="active" label="active" />
+              <el-option value="disabled" label="disabled" />
+              <el-option value="pending" label="pending" />
+            </el-select>
+          </div>
+        </div>
+        <button type="submit" :disabled="loading" class="submit-btn">查询</button>
+      </form>
+    </div>
 
-    <hr />
+    <div class="table-card">
+      <h2>用户列表</h2>
+      <p v-if="loading" class="loading">加载中...</p>
+      <div v-else-if="items.length > 0" class="user-list">
+        <article v-for="item in items" :key="item.id" class="user-card">
+          <div class="user-info">
+            <div class="user-header">
+              <span class="username">{{ item.username }}</span>
+              <span class="status-badge" :class="item.status">{{ item.status }}</span>
+            </div>
+            <div class="user-meta">{{ item.email }}</div>
+            <div class="user-meta">
+              role={{ item.role }} | quota={{ item.quota }} | used={{ item.used_quota }} | group={{ item.user_group?.name || item.user_group_id || '-' }}
+            </div>
+          </div>
 
-    <p v-if="loading">加载中...</p>
-    <ul v-else-if="items.length > 0">
-      <li v-for="item in items" :key="item.id">
-        <div>
-          {{ item.username }} / {{ item.email }} / {{ item.role }} / quota={{ item.quota }} / group={{ item.user_group?.name || item.user_group_id || '-' }}
-        </div>
-        <form @submit.prevent="assignUserGroup(item.id)">
-          <label>
-            user group
-            <select v-model="selectedGroupByUser[item.id]">
-              <option value="">未分组</option>
-              <option v-for="group in groups" :key="group.id" :value="group.id">
-                {{ group.name }}
-              </option>
-            </select>
-          </label>
-          <button type="submit" :disabled="assigningUserID === item.id">更新分组</button>
-        </form>
-        <form @submit.prevent="adjustQuota(item.id)">
-          <label>
-            delta
-            <input v-model.trim="quotaDelta[item.id]" type="number" />
-          </label>
-          <label>
-            reason
-            <input v-model.trim="quotaReason[item.id]" type="text" />
-          </label>
-          <button type="submit" :disabled="submittingUserID === item.id">调额</button>
-        </form>
-        <div>
-          <label>
-            usage model
-            <select v-model="usageModelByUser[item.id]">
-              <option value="">all models</option>
-              <option v-for="model in models" :key="model.id" :value="model.id">
-                {{ model.display_name }}
-              </option>
-            </select>
-          </label>
-          <button type="button" @click="loadLimitUsage(item.id)" :disabled="loadingUsageUserID === item.id">加载限额用量</button>
-          <button type="button" @click="loadAdjustments(item.id)" :disabled="loadingAdjustmentUserID === item.id">加载调整记录</button>
-        </div>
-        <div v-if="usageReports[item.id]">
-          <div>policy source={{ usageReports[item.id]?.effective_policy.source || 'none' }}</div>
-          <div>hour requests: used={{ usageReports[item.id]?.usage.hour.requests }} / adj={{ usageReports[item.id]?.adjustments.hour.requests }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.hour.requests) }}</div>
-          <div>hour tokens: used={{ usageReports[item.id]?.usage.hour.tokens }} / adj={{ usageReports[item.id]?.adjustments.hour.tokens }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.hour.tokens) }}</div>
-          <div>week requests: used={{ usageReports[item.id]?.usage.week.requests }} / adj={{ usageReports[item.id]?.adjustments.week.requests }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.week.requests) }}</div>
-          <div>week tokens: used={{ usageReports[item.id]?.usage.week.tokens }} / adj={{ usageReports[item.id]?.adjustments.week.tokens }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.week.tokens) }}</div>
-          <div>lifetime requests: used={{ usageReports[item.id]?.usage.lifetime.requests }} / adj={{ usageReports[item.id]?.adjustments.lifetime.requests }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.lifetime.requests) }}</div>
-          <div>lifetime tokens: used={{ usageReports[item.id]?.usage.lifetime.tokens }} / adj={{ usageReports[item.id]?.adjustments.lifetime.tokens }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.lifetime.tokens) }}</div>
-        </div>
-        <form @submit.prevent="createAdjustment(item.id)">
-          <label>
-            adjust model
-            <select v-model="adjustmentModelByUser[item.id]">
-              <option value="">all models</option>
-              <option v-for="model in models" :key="model.id" :value="model.id">
-                {{ model.display_name }}
-              </option>
-            </select>
-          </label>
-          <label>
-            metric
-            <select v-model="adjustmentMetricByUser[item.id]">
-              <option value="request_count">request_count</option>
-              <option value="total_tokens">total_tokens</option>
-            </select>
-          </label>
-          <label>
-            window
-            <select v-model="adjustmentWindowByUser[item.id]">
-              <option value="rolling_hour">rolling_hour</option>
-              <option value="rolling_week">rolling_week</option>
-              <option value="lifetime">lifetime</option>
-            </select>
-          </label>
-          <label>
-            delta
-            <input v-model.trim="adjustmentDeltaByUser[item.id]" type="number" />
-          </label>
-          <label>
-            reason
-            <input v-model.trim="adjustmentReasonByUser[item.id]" type="text" />
-          </label>
-          <button type="submit" :disabled="submittingAdjustmentUserID === item.id">新增限额调整</button>
-        </form>
-        <ul v-if="(adjustmentsByUser[item.id] ?? []).length > 0">
-          <li v-for="adjustment in adjustmentsByUser[item.id]" :key="adjustment.id">
-            {{ adjustment.metric_type }} / {{ adjustment.window_type }} / delta={{ adjustment.delta }} / model={{ adjustment.model_id || 'all' }} / expires_at={{ adjustment.expires_at || '-' }}
-          </li>
-        </ul>
-      </li>
-    </ul>
-    <p v-else>暂无用户</p>
+          <div class="user-actions">
+            <form @submit.prevent="assignUserGroup(item.id)" class="inline-form">
+              <label>用户组</label>
+              <el-select v-model="selectedGroupByUser[item.id]" class="small-select">
+                <el-option value="" label="未分组" />
+                <el-option v-for="group in groups" :key="group.id" :value="group.id" :label="group.name" />
+              </el-select>
+              <button type="submit" :disabled="assigningUserID === item.id" class="small-btn">更新</button>
+            </form>
+
+            <form @submit.prevent="adjustQuota(item.id)" class="inline-form">
+              <label>调额</label>
+              <input v-model.trim="quotaDelta[item.id]" type="number" placeholder="delta" class="small-input" />
+              <input v-model.trim="quotaReason[item.id]" type="text" placeholder="reason" class="reason-input" />
+              <button type="submit" :disabled="submittingUserID === item.id" class="small-btn">调额</button>
+            </form>
+
+            <div class="inline-form">
+              <label>限额模型</label>
+              <el-select v-model="usageModelByUser[item.id]" class="small-select">
+                <el-option value="" label="all models" />
+                <el-option v-for="model in models" :key="model.id" :value="model.id" :label="model.display_name" />
+              </el-select>
+              <button type="button" @click="loadLimitUsage(item.id)" :disabled="loadingUsageUserID === item.id" class="small-btn">加载限额</button>
+              <button type="button" @click="loadAdjustments(item.id)" :disabled="loadingAdjustmentUserID === item.id" class="small-btn">调整记录</button>
+            </div>
+          </div>
+
+          <div v-if="usageReports[item.id]" class="usage-report">
+            <div class="report-header">限额用量报告 (来源: {{ usageReports[item.id]?.effective_policy.source || 'none' }})</div>
+            <div class="report-grid">
+              <div class="report-item">
+                <span class="label">Hour Requests:</span>
+                <span>{{ usageReports[item.id]?.usage.hour.requests }} / adj={{ usageReports[item.id]?.adjustments.hour.requests }} / remain={{ remainingLabel(usageReports[item.id]?.remaining.hour.requests) }}</span>
+              </div>
+              <div class="report-item">
+                <span class="label">Hour Tokens:</span>
+                <span>{{ usageReports[item.id]?.usage.hour.tokens }} / adj={{ usageReports[item.id]?.adjustments.hour.tokens }} / remain={{ remainingLabel(usageReports[item.id]?.remaining.hour.tokens) }}</span>
+              </div>
+              <div class="report-item">
+                <span class="label">Week Requests:</span>
+                <span>{{ usageReports[item.id]?.usage.week.requests }} / adj={{ usageReports[item.id]?.adjustments.week.requests }} / remain={{ remainingLabel(usageReports[item.id]?.remaining.week.requests) }}</span>
+              </div>
+              <div class="report-item">
+                <span class="label">Week Tokens:</span>
+                <span>{{ usageReports[item.id]?.usage.week.tokens }} / adj={{ usageReports[item.id]?.adjustments.week.tokens }} / remain={{ remainingLabel(usageReports[item.id]?.remaining.week.tokens) }}</span>
+              </div>
+              <div class="report-item">
+                <span class="label">Lifetime Requests:</span>
+                <span>{{ usageReports[item.id]?.usage.lifetime.requests }} / adj={{ usageReports[item.id]?.adjustments.lifetime.requests }} / remain={{ remainingLabel(usageReports[item.id]?.remaining.lifetime.requests) }}</span>
+              </div>
+              <div class="report-item">
+                <span class="label">Lifetime Tokens:</span>
+                <span>{{ usageReports[item.id]?.usage.lifetime.tokens }} / adj={{ usageReports[item.id]?.adjustments.lifetime.tokens }} / remain={{ remainingLabel(usageReports[item.id]?.remaining.lifetime.tokens) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <form @submit.prevent="createAdjustment(item.id)" class="adjustment-form">
+            <label>
+              adjust model
+              <el-select v-model="adjustmentModelByUser[item.id]">
+                <el-option value="" label="all models" />
+                <el-option v-for="model in models" :key="model.id" :value="model.id" :label="model.display_name" />
+              </el-select>
+            </label>
+            <label>
+              metric
+              <el-select v-model="adjustmentMetricByUser[item.id]">
+                <el-option value="request_count" label="request_count" />
+                <el-option value="total_tokens" label="total_tokens" />
+              </el-select>
+            </label>
+            <label>
+              window
+              <el-select v-model="adjustmentWindowByUser[item.id]">
+                <el-option value="rolling_hour" label="rolling_hour" />
+                <el-option value="rolling_week" label="rolling_week" />
+                <el-option value="lifetime" label="lifetime" />
+              </el-select>
+            </label>
+            <label>
+              delta
+              <input v-model.trim="adjustmentDeltaByUser[item.id]" type="number" />
+            </label>
+            <label>
+              reason
+              <input v-model.trim="adjustmentReasonByUser[item.id]" type="text" />
+            </label>
+            <button type="submit" :disabled="submittingAdjustmentUserID === item.id" class="small-btn">新增限额调整</button>
+          </form>
+
+          <ul v-if="(adjustmentsByUser[item.id] ?? []).length > 0" class="adjustment-list">
+            <li v-for="adjustment in adjustmentsByUser[item.id]" :key="adjustment.id">
+              {{ adjustment.metric_type }} / {{ adjustment.window_type }} / delta={{ adjustment.delta }} / model={{ adjustment.model_id || 'all' }} / expires_at={{ adjustment.expires_at || '-' }}
+            </li>
+          </ul>
+        </article>
+      </div>
+      <p v-else class="empty">暂无用户</p>
+    </div>
   </div>
 </template>
 
@@ -419,8 +441,55 @@ function toErrorMessage(error: unknown) {
 
 .inline-form {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
+}
+
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.user-card {
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 1rem;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.username {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.user-meta {
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  word-break: break-all;
+}
+
+.user-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .small-input {
@@ -433,7 +502,26 @@ function toErrorMessage(error: unknown) {
   width: 80px;
 }
 
+.small-select {
+  min-width: 180px;
+}
+
+.reason-input {
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  min-width: 180px;
+}
+
 .small-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.reason-input:focus {
   outline: none;
   border-color: var(--accent-primary);
 }
@@ -456,5 +544,81 @@ function toErrorMessage(error: unknown) {
 .small-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.usage-report {
+  border: 1px dashed var(--input-border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: var(--input-bg);
+}
+
+.report-header {
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.5rem;
+}
+
+.report-item {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.report-item .label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.adjustment-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.adjustment-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.adjustment-form :deep(.el-select) {
+  width: 100%;
+}
+
+.adjustment-form input {
+  width: 100%;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+}
+
+.adjustment-form input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.adjustment-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 </style>

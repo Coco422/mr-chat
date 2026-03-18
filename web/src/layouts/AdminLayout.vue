@@ -1,40 +1,91 @@
 <template>
-  <div>
-    <h1>Admin Console</h1>
-    <nav>
-      <RouterLink to="/admin/upstreams">Upstreams</RouterLink>
-      <span> | </span>
-      <RouterLink to="/admin/channels">Channels</RouterLink>
-      <span> | </span>
-      <RouterLink to="/admin/models">Models</RouterLink>
-      <span> | </span>
-      <RouterLink to="/admin/user-groups">User Groups</RouterLink>
-      <span> | </span>
-      <RouterLink to="/admin/users">Users</RouterLink>
-      <span> | </span>
-      <RouterLink to="/admin/redeem-codes">Redeem Codes</RouterLink>
-      <span> | </span>
-      <RouterLink to="/admin/audit-logs">Audit Logs</RouterLink>
-      <span> | </span>
-      <RouterLink to="/chat">Back to App</RouterLink>
-    </nav>
-    <RouterView />
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-header">
+        <div class="title-wrap">
+          <h1>MrChat Admin</h1>
+          <p>管理控制台</p>
+        </div>
+        <button class="icon-btn" @click="toggleTheme" :title="isDark() ? '切换浅色主题' : '切换深色主题'">
+          {{ isDark() ? '☀' : '☾' }}
+        </button>
+      </div>
+
+      <nav class="admin-nav">
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.to"
+          :to="item.to"
+          class="nav-item"
+          :class="{ active: isActive(item.to) }"
+        >
+          <span class="nav-dot"></span>
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div v-if="auth.user" class="user-card">
+          <div class="avatar">{{ auth.user.username.slice(0, 1).toUpperCase() }}</div>
+          <div class="user-meta">
+            <div class="name">{{ auth.user.username }}</div>
+            <div class="role">{{ auth.user.role }}</div>
+          </div>
+        </div>
+
+        <div class="footer-actions">
+          <RouterLink to="/chat" class="action-link">返回聊天</RouterLink>
+          <button class="action-btn" @click="handleSignOut">退出登录</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <RouterView />
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
+
+import { useTheme } from '@/composables/useTheme'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
+const { toggleTheme, isDark } = useTheme()
+
+const navItems = [
+  { to: '/admin/upstreams', label: '上游配置' },
+  { to: '/admin/channels', label: '渠道管理' },
+  { to: '/admin/models', label: '模型管理' },
+  { to: '/admin/user-groups', label: '用户组' },
+  { to: '/admin/users', label: '用户管理' },
+  { to: '/admin/redeem-codes', label: '兑换码' },
+  { to: '/admin/audit-logs', label: '审计日志' }
+]
+
+function isActive(path: string) {
+  return route.path === path
+}
+
+async function handleSignOut() {
+  await auth.signOut()
+  router.push({ name: 'login' })
+}
 </script>
 
 <style scoped>
 .admin-layout {
   display: flex;
-  height: 100vh;
+  min-height: 100vh;
   background: var(--bg-primary);
 }
 
 .admin-sidebar {
-  width: 260px;
+  width: 280px;
   background: var(--bg-secondary);
   border-right: 1px solid var(--glass-border);
   display: flex;
@@ -42,33 +93,54 @@ import { RouterLink, RouterView } from 'vue-router'
 }
 
 .sidebar-header {
-  padding: 1.5rem 1rem;
+  padding: 1.25rem 1rem;
   border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
-.sidebar-header h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
+.title-wrap h1 {
   margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.title-wrap p {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
 .admin-nav {
   flex: 1;
-  padding: 1rem 0.5rem;
+  overflow-y: auto;
+  padding: 0.75rem 0.5rem;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.875rem 1rem;
-  margin-bottom: 0.25rem;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 0.35rem;
   border-radius: 8px;
-  text-decoration: none;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  text-decoration: none;
   transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
 .nav-item:hover {
@@ -76,36 +148,122 @@ import { RouterLink, RouterView } from 'vue-router'
   color: var(--text-primary);
 }
 
-.nav-item.router-link-active {
+.nav-item.active {
+  color: var(--text-primary);
+  border-color: var(--input-border);
   background: var(--input-bg);
-  color: var(--accent-primary);
+}
+
+.nav-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent-primary);
+  opacity: 0.8;
 }
 
 .sidebar-footer {
-  padding: 1rem;
   border-top: 1px solid var(--glass-border);
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
 }
 
-.back-btn {
+.user-card {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  text-decoration: none;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
+  gap: 0.65rem;
 }
 
-.back-btn:hover {
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--accent-primary);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.user-meta {
+  min-width: 0;
+}
+
+.name {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.role {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.footer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.action-link,
+.action-btn {
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  text-align: center;
+  border: 1px solid var(--input-border);
   background: var(--input-bg);
   color: var(--text-primary);
+  text-decoration: none;
 }
 
-.admin-content {
+.action-btn {
+  cursor: pointer;
+}
+
+.action-link:hover,
+.action-btn:hover {
+  border-color: var(--accent-primary);
+}
+
+.admin-main {
   flex: 1;
-  overflow-y: auto;
-  background: var(--bg-primary);
+  min-width: 0;
+  overflow: auto;
+}
+
+@media (max-width: 960px) {
+  .admin-layout {
+    flex-direction: column;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .admin-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-actions {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

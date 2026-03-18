@@ -41,7 +41,7 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label>状态</label>
+            <label>Status</label>
             <el-select v-model="form.status">
               <el-option value="active" label="Active" />
               <el-option value="disabled" label="Disabled" />

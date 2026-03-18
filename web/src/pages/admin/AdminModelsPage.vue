@@ -9,97 +9,103 @@
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-    <form @submit.prevent="createModel">
-      <div>
-        <label>
-          Model Key
-          <input v-model.trim="form.modelKey" type="text" required />
-        </label>
-      </div>
-      <div>
-        <label>
-          Display Name
-          <input v-model.trim="form.displayName" type="text" required />
-        </label>
-      </div>
-      <div>
-        <label>
-          Provider Type
-          <input v-model.trim="form.providerType" type="text" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Context Length
-          <input v-model.number="form.contextLength" type="number" min="1" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Max Output Tokens
-          <input v-model.number="form.maxOutputTokens" type="number" min="1" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Visible User Group IDs
+    <div v-if="showForm" class="form-card">
+      <h2>创建模型</h2>
+      <form @submit.prevent="createModel" class="admin-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Model Key</label>
+            <input v-model.trim="form.modelKey" type="text" required />
+          </div>
+          <div class="form-group">
+            <label>Display Name</label>
+            <input v-model.trim="form.displayName" type="text" required />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Provider Type</label>
+            <input v-model.trim="form.providerType" type="text" />
+          </div>
+          <div class="form-group">
+            <label>Context Length</label>
+            <input v-model.number="form.contextLength" type="number" min="1" />
+          </div>
+          <div class="form-group">
+            <label>Max Output Tokens</label>
+            <input v-model.number="form.maxOutputTokens" type="number" min="1" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Visible User Group IDs</label>
           <input v-model.trim="form.visibleUserGroupIDsRaw" type="text" placeholder="uuid1,uuid2" />
-        </label>
-      </div>
-      <div>
-        <label>
-          Channel
-          <select v-model="form.channelID">
-            <option value="">默认路由</option>
-            <option v-for="channel in channels" :key="channel.id" :value="channel.id">
-              {{ channel.name }}
-            </option>
-          </select>
-        </label>
-      </div>
-      <div>
-        <label>
-          Upstream
-          <select v-model="form.upstreamID">
-            <option value="">请选择</option>
-            <option v-for="upstream in upstreams" :key="upstream.id" :value="upstream.id">
-              {{ upstream.name }}
-            </option>
-          </select>
-        </label>
-      </div>
-      <div>
-        <label>
-          状态
-          <select v-model="form.status">
-            <option value="active">active</option>
-            <option value="disabled">disabled</option>
-          </select>
-        </label>
-      </div>
-      <button type="submit" :disabled="submitting">创建模型</button>
-      <button type="button" @click="loadData" :disabled="loading">刷新</button>
-    </form>
-
-    <hr />
-
-    <p v-if="loading">加载中...</p>
-    <ul v-else-if="items.length > 0">
-      <li v-for="item in items" :key="item.id">
-        {{ item.display_name }} / {{ item.model_key }} / {{ item.status }}
-        <div>
-          visible_user_group_ids:
-          {{ item.visible_user_group_ids.length > 0 ? item.visible_user_group_ids.join(', ') : 'all users' }}
         </div>
-        <div>
-          bindings:
-          <span v-for="binding in item.route_bindings" :key="binding.id">
-            {{ binding.channel_id || 'default' }} -> {{ binding.upstream_id }}#{{ binding.priority }}
-          </span>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Channel</label>
+            <el-select v-model="form.channelID" style="width: 100%">
+              <el-option value="" label="默认路由" />
+              <el-option v-for="channel in channels" :key="channel.id" :value="channel.id" :label="channel.name" />
+            </el-select>
+          </div>
+          <div class="form-group">
+            <label>Upstream</label>
+            <el-select v-model="form.upstreamID" style="width: 100%">
+              <el-option value="" label="请选择" />
+              <el-option v-for="upstream in upstreams" :key="upstream.id" :value="upstream.id" :label="upstream.name" />
+            </el-select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <el-select v-model="form.status" style="width: 100%">
+              <el-option value="active" label="active" />
+              <el-option value="disabled" label="disabled" />
+            </el-select>
+          </div>
         </div>
-      </li>
-    </ul>
-    <p v-else>暂无模型</p>
+
+        <button type="submit" :disabled="submitting" class="submit-btn">创建模型</button>
+      </form>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header">
+        <h2>模型列表</h2>
+        <button class="refresh-btn" @click="loadData" :disabled="loading">刷新</button>
+      </div>
+
+      <p v-if="loading" class="loading">加载中...</p>
+      <table v-else-if="items.length > 0">
+        <thead>
+          <tr>
+            <th>Display Name</th>
+            <th>Model Key</th>
+            <th>状态</th>
+            <th>用户组</th>
+            <th>路由绑定</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in items" :key="item.id">
+            <td>{{ item.display_name }}</td>
+            <td class="model-key">{{ item.model_key }}</td>
+            <td><span class="status-badge" :class="item.status">{{ item.status }}</span></td>
+            <td class="user-groups">
+              {{ item.visible_user_group_ids.length > 0 ? item.visible_user_group_ids.join(', ') : 'all users' }}
+            </td>
+            <td>
+              <span v-for="binding in item.route_bindings" :key="binding.id" class="binding-tag">
+                {{ binding.channel_id || 'default' }} → {{ binding.upstream_id }}#{{ binding.priority }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty">暂无模型</p>
+    </div>
   </div>
 </template>
 
@@ -261,13 +267,26 @@ function toErrorMessage(error: unknown) {
 <style scoped>
 @import '@/styles/admin.css';
 
+.model-key {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.user-groups {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 .binding-tag {
   display: inline-block;
   padding: 0.25rem 0.5rem;
-  background: var(--input-bg);
+  background: var(--bg-primary);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   font-size: 0.75rem;
   color: var(--text-secondary);
   margin-right: 0.5rem;
+  font-family: monospace;
 }
 </style>

@@ -1,106 +1,131 @@
 <template>
-  <section>
-    <h1>User Groups</h1>
-    <p v-if="errorMessage">{{ errorMessage }}</p>
+  <div class="admin-page">
+    <div class="page-header">
+      <h1>用户分组管理</h1>
+      <button class="primary-btn" @click="showCreateForm = !showCreateForm">
+        {{ showCreateForm ? '取消' : '+ 新建分组' }}
+      </button>
+    </div>
 
-    <form @submit.prevent="createUserGroup">
-      <div>
-        <label>
-          名称
-          <input v-model.trim="createForm.name" type="text" required />
-        </label>
-      </div>
-      <div>
-        <label>
-          Description
+    <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
+
+    <div v-if="showCreateForm" class="form-card">
+      <h2>创建分组</h2>
+      <form @submit.prevent="createUserGroup" class="admin-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>名称</label>
+            <input v-model.trim="createForm.name" type="text" required />
+          </div>
+          <div class="form-group">
+            <label>状态</label>
+            <el-select v-model="createForm.status" style="width: 100%">
+              <el-option value="active" label="active" />
+              <el-option value="disabled" label="disabled" />
+            </el-select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
           <input v-model.trim="createForm.description" type="text" />
-        </label>
-      </div>
-      <div>
-        <label>
-          状态
-          <select v-model="createForm.status">
-            <option value="active">active</option>
-            <option value="disabled">disabled</option>
-          </select>
-        </label>
-      </div>
-      <button type="submit" :disabled="submittingGroup">创建分组</button>
-      <button type="button" @click="loadData" :disabled="loading">刷新</button>
-    </form>
-
-    <hr />
-
-    <div>
-      <label>
-        当前分组
-        <select v-model="selectedGroupID">
-          <option value="">请选择</option>
-          <option v-for="group in groups" :key="group.id" :value="group.id">
-            {{ group.name }}
-          </option>
-        </select>
-      </label>
-      <button type="button" @click="loadPolicies" :disabled="!selectedGroupID || loadingPolicies">加载限额</button>
-      <button type="button" @click="addPolicyRow" :disabled="!selectedGroupID">新增规则行</button>
-      <button type="button" @click="savePolicies" :disabled="!selectedGroupID || submittingPolicies">保存全部规则</button>
+        </div>
+        <button type="submit" :disabled="submittingGroup" class="submit-btn">创建分组</button>
+      </form>
     </div>
 
-    <p v-if="loadingPolicies">限额加载中...</p>
-    <div v-for="(policy, index) in policyRows" :key="`${policy.modelID}-${index}`">
-      <hr />
-      <label>
-        Model
-        <select v-model="policy.modelID">
-          <option value="">默认模板</option>
-          <option v-for="model in models" :key="model.id" :value="model.id">
-            {{ model.display_name }}
-          </option>
-        </select>
-      </label>
-      <label>
-        hour requests
-        <input v-model.trim="policy.hourRequestLimit" type="number" />
-      </label>
-      <label>
-        week requests
-        <input v-model.trim="policy.weekRequestLimit" type="number" />
-      </label>
-      <label>
-        lifetime requests
-        <input v-model.trim="policy.lifetimeRequestLimit" type="number" />
-      </label>
-      <label>
-        hour tokens
-        <input v-model.trim="policy.hourTokenLimit" type="number" />
-      </label>
-      <label>
-        week tokens
-        <input v-model.trim="policy.weekTokenLimit" type="number" />
-      </label>
-      <label>
-        lifetime tokens
-        <input v-model.trim="policy.lifetimeTokenLimit" type="number" />
-      </label>
-      <label>
-        status
-        <select v-model="policy.status">
-          <option value="active">active</option>
-          <option value="disabled">disabled</option>
-        </select>
-      </label>
-      <button type="button" @click="removePolicyRow(index)">删除</button>
+    <div class="table-card">
+      <div class="table-header">
+        <h2>限额策略配置</h2>
+        <button class="refresh-btn" @click="loadData" :disabled="loading">刷新</button>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.5rem;">
+        <label>当前分组</label>
+        <el-select v-model="selectedGroupID" style="width: 100%" @change="loadPolicies">
+          <el-option value="" label="请选择" />
+          <el-option v-for="group in groups" :key="group.id" :value="group.id" :label="group.name" />
+        </el-select>
+      </div>
+
+      <div v-if="selectedGroupID" style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+        <button class="refresh-btn" @click="loadPolicies" :disabled="loadingPolicies">加载限额</button>
+        <button class="refresh-btn" @click="addPolicyRow">新增规则行</button>
+        <button class="primary-btn" @click="savePolicies" :disabled="submittingPolicies">保存全部规则</button>
+      </div>
+
+      <p v-if="loadingPolicies" class="loading">限额加载中...</p>
+      <div v-else-if="policyRows.length > 0" class="policy-list">
+        <div v-for="(policy, index) in policyRows" :key="`${policy.modelID}-${index}`" class="policy-row">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Model</label>
+              <el-select v-model="policy.modelID" style="width: 100%">
+                <el-option value="" label="默认模板" />
+                <el-option v-for="model in models" :key="model.id" :value="model.id" :label="model.display_name" />
+              </el-select>
+            </div>
+            <div class="form-group">
+              <label>状态</label>
+              <el-select v-model="policy.status" style="width: 100%">
+                <el-option value="active" label="active" />
+                <el-option value="disabled" label="disabled" />
+              </el-select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Hour Requests</label>
+              <input v-model.trim="policy.hourRequestLimit" type="number" />
+            </div>
+            <div class="form-group">
+              <label>Week Requests</label>
+              <input v-model.trim="policy.weekRequestLimit" type="number" />
+            </div>
+            <div class="form-group">
+              <label>Lifetime Requests</label>
+              <input v-model.trim="policy.lifetimeRequestLimit" type="number" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Hour Tokens</label>
+              <input v-model.trim="policy.hourTokenLimit" type="number" />
+            </div>
+            <div class="form-group">
+              <label>Week Tokens</label>
+              <input v-model.trim="policy.weekTokenLimit" type="number" />
+            </div>
+            <div class="form-group">
+              <label>Lifetime Tokens</label>
+              <input v-model.trim="policy.lifetimeTokenLimit" type="number" />
+            </div>
+          </div>
+          <button type="button" @click="removePolicyRow(index)" class="refresh-btn">删除</button>
+        </div>
+      </div>
     </div>
 
-    <hr />
-
-    <ul v-if="groups.length > 0">
-      <li v-for="group in groups" :key="group.id">
-        {{ group.name }} / {{ group.status }} / {{ group.description || '-' }}
-      </li>
-    </ul>
-    <p v-else>暂无用户分组</p>
-  </section>
+    <div class="table-card">
+      <h2>分组列表</h2>
+      <table v-if="groups.length > 0">
+        <thead>
+          <tr>
+            <th>名称</th>
+            <th>状态</th>
+            <th>描述</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="group in groups" :key="group.id">
+            <td>{{ group.name }}</td>
+            <td><span class="status-badge" :class="group.status">{{ group.status }}</span></td>
+            <td>{{ group.description || '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="empty">暂无用户分组</p>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -138,6 +163,7 @@ const loadingPolicies = ref(false)
 const submittingGroup = ref(false)
 const submittingPolicies = ref(false)
 const errorMessage = ref('')
+const showCreateForm = ref(false)
 const groups = ref<UserGroupItem[]>([])
 const models = ref<ModelItem[]>([])
 const selectedGroupID = ref('')
@@ -198,6 +224,7 @@ async function createUserGroup() {
 
     createForm.name = ''
     createForm.description = ''
+    showCreateForm.value = false
     await loadData()
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
@@ -308,3 +335,20 @@ function toErrorMessage(error: unknown) {
   return '请求失败'
 }
 </script>
+
+<style scoped>
+@import '@/styles/admin.css';
+
+.policy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.policy-row {
+  padding: 1.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+}
+</style>

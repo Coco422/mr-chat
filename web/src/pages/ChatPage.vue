@@ -1,25 +1,23 @@
 <template>
-  <section>
-    <h1>Chat</h1>
-    <p v-if="errorMessage">{{ errorMessage }}</p>
+  <section class="chat-page">
+    <header class="page-header">
+      <h1>Chat</h1>
+      <div class="header-actions">
+        <button type="button" class="action-btn" @click="reloadAll" :disabled="loading">刷新</button>
+        <button type="button" class="action-btn warning" @click="stopStreaming" :disabled="!sending">停止生成</button>
+      </div>
+    </header>
 
-    <div>
-      <button type="button" @click="reloadAll" :disabled="loading">刷新</button>
-      <button type="button" @click="stopStreaming" :disabled="!sending">停止生成</button>
-    </div>
+    <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
 
-    <hr />
-
-    <div>
-      <label>
+    <div class="meta-card">
+      <label class="meta-item">
         当前会话
-        <span>{{ currentConversationId || 'new' }}</span>
+        <span class="meta-value">{{ currentConversationId || 'new' }}</span>
       </label>
-    </div>
-    <div>
-      <label>
+      <label class="meta-item">
         模型
-        <select v-model="selectedModelID">
+        <select v-model="selectedModelID" class="model-select">
           <option value="">请选择模型</option>
           <option v-for="model in models" :key="model.id" :value="model.id">
             {{ model.display_name }} ({{ model.model_key }})
@@ -28,31 +26,27 @@
       </label>
     </div>
 
-    <hr />
-
-    <section>
+    <section class="messages-card">
       <h2>消息列表</h2>
-      <p v-if="loadingMessages">消息加载中...</p>
-      <ul v-else-if="messages.length > 0">
-        <li v-for="message in messages" :key="message.id">
-          <div>{{ message.role }} / {{ message.status }} / {{ message.created_at }}</div>
-          <div>{{ message.content }}</div>
-          <div v-if="message.reasoning_content">reasoning: {{ message.reasoning_content }}</div>
-          <div v-if="message.finish_reason">finish_reason: {{ message.finish_reason }}</div>
+      <p v-if="loadingMessages" class="empty">消息加载中...</p>
+      <ul v-else-if="messages.length > 0" class="message-list">
+        <li v-for="message in messages" :key="message.id" class="message-item" :class="`role-${message.role}`">
+          <div class="message-meta">{{ message.role }} / {{ message.status }} / {{ message.created_at }}</div>
+          <div class="message-content">{{ message.content }}</div>
+          <div v-if="message.reasoning_content" class="message-extra">reasoning: {{ message.reasoning_content }}</div>
+          <div v-if="message.finish_reason" class="message-extra">finish_reason: {{ message.finish_reason }}</div>
         </li>
       </ul>
-      <p v-else>暂无消息</p>
+      <p v-else class="empty">暂无消息</p>
     </section>
 
-    <hr />
-
-    <section>
+    <section class="composer-card">
       <h2>发送消息</h2>
-      <form @submit.prevent="sendMessage">
-        <div>
-          <textarea v-model="inputMessage" rows="6" placeholder="输入消息..." />
+      <form @submit.prevent="sendMessage" class="composer-form">
+        <div class="input-wrap">
+          <textarea v-model="inputMessage" rows="6" placeholder="输入消息..." class="message-input" />
         </div>
-        <button type="submit" :disabled="sending || !inputMessage.trim()">发送</button>
+        <button type="submit" class="send-btn" :disabled="sending || !inputMessage.trim()">发送</button>
       </form>
     </section>
   </section>
@@ -475,3 +469,203 @@ function toErrorMessage(error: unknown) {
   return '请求失败'
 }
 </script>
+
+<style scoped>
+.chat-page {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.action-btn {
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+}
+
+.action-btn.warning {
+  border-color: color-mix(in srgb, var(--error-color) 45%, var(--input-border));
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-banner {
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--error-color) 45%, transparent);
+  background: color-mix(in srgb, var(--error-color) 10%, transparent);
+  color: var(--error-color);
+}
+
+.meta-card,
+.messages-card,
+.composer-card {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  padding: 0.9rem;
+}
+
+.meta-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.meta-value {
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.model-select,
+.message-input {
+  width: 100%;
+  border: 1px solid var(--input-border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+}
+
+.messages-card {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.messages-card h2,
+.composer-card h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1rem;
+}
+
+.message-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  overflow: auto;
+}
+
+.message-item {
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+}
+
+.message-item.role-user {
+  border-left: 3px solid var(--accent-primary);
+}
+
+.message-item.role-assistant {
+  border-left: 3px solid var(--accent-secondary);
+}
+
+.message-meta {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  margin-bottom: 0.35rem;
+}
+
+.message-content {
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.message-extra {
+  margin-top: 0.35rem;
+  color: var(--text-secondary);
+  font-size: 0.83rem;
+  white-space: pre-wrap;
+}
+
+.empty {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.composer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.message-input {
+  resize: vertical;
+  min-height: 124px;
+}
+
+.send-btn {
+  align-self: flex-end;
+  border: none;
+  background: var(--accent-primary);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  cursor: pointer;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: var(--accent-secondary);
+}
+
+.send-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .chat-page {
+    padding: 0.9rem;
+  }
+
+  .meta-card {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+</style>
