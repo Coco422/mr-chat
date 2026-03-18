@@ -152,86 +152,81 @@ async function handleSignOut() {
 .app-layout {
   display: flex;
   height: 100vh;
-  background: var(--bg-primary);
+  background: var(--layout-content-bg);
 }
 
 .sidebar {
-  width: 280px;
-  background: var(--bg-secondary);
+  width: 272px;
+  background: var(--layout-sidebar-bg);
   border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
 }
 
 .sidebar-header {
-  padding: 1.5rem 1rem;
+  padding: 1.25rem 1rem;
   border-bottom: 1px solid var(--glass-border);
 }
 
 .logo {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 1rem;
+  margin: 0 0 0.9rem;
 }
 
 .new-chat-btn {
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 0.4rem 0.5rem;
   background: var(--accent-primary);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, opacity 0.2s ease;
 }
 
 .new-chat-btn:hover {
   background: var(--accent-secondary);
-  transform: translateY(-1px);
 }
 
 .conversations-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0.8rem 0.75rem;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.35rem;
 }
 
 .conversation-item {
   display: block;
-  padding: 0.95rem 1rem;
-  border-radius: 14px;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
   text-decoration: none;
   color: var(--text-secondary);
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 82%, transparent);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--input-bg) 62%, transparent), color-mix(in srgb, var(--bg-secondary) 88%, transparent));
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.03);
+  border: 1px solid transparent;
+  background: transparent;
 }
 
 .conversation-item:hover {
-  background: color-mix(in srgb, var(--accent-glow) 28%, var(--input-bg));
+  background: var(--surface-muted);
   color: var(--text-primary);
-  border-color: color-mix(in srgb, var(--accent-primary) 38%, var(--glass-border));
-  transform: translateY(-1px);
 }
 
 .conversation-item.active {
-  background: color-mix(in srgb, var(--accent-glow) 40%, var(--input-bg));
+  background: var(--surface-muted);
   color: var(--text-primary);
-  border-color: color-mix(in srgb, var(--accent-primary) 55%, var(--glass-border));
-  box-shadow: inset 3px 0 0 var(--accent-primary), 0 12px 24px rgba(0, 0, 0, 0.05);
+  border-color: var(--glass-border);
+  box-shadow: inset 3px 0 0 var(--accent-primary);
 }
 
 .conv-title {
@@ -256,7 +251,7 @@ async function handleSignOut() {
 }
 
 .nav-menu {
-  padding: 0.5rem;
+  padding: 0.5rem 0.75rem 0.75rem;
   border-top: 1px solid var(--glass-border);
 }
 
@@ -264,22 +259,22 @@ async function handleSignOut() {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: 0.8rem 0.9rem;
   margin-bottom: 0.25rem;
-  border-radius: 8px;
+  border-radius: 12px;
   text-decoration: none;
   color: var(--text-secondary);
   font-size: 0.9rem;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .nav-item:hover {
-  background: var(--input-bg);
+  background: var(--surface-muted);
   color: var(--text-primary);
 }
 
 .nav-item.router-link-active {
-  background: var(--input-bg);
+  background: var(--surface-muted);
   color: var(--accent-primary);
 }
 
@@ -287,28 +282,29 @@ async function handleSignOut() {
   padding: 1rem;
   border-top: 1px solid var(--glass-border);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.8rem;
 }
 
 .user-info {
-  flex: 1;
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  width: 100%;
 }
 
 .user-avatar {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--accent-primary);
-  color: white;
+  background: var(--surface-muted);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
   font-size: 0.9rem;
+  border: 1px solid var(--glass-border);
 }
 
 .user-details {
@@ -333,26 +329,28 @@ async function handleSignOut() {
 .icon-btn {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  background: transparent;
+  border-radius: 10px;
+  background: var(--layout-sidebar-bg);
   border: 1px solid var(--glass-border);
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .icon-btn:hover {
-  background: var(--input-bg);
+  background: var(--surface-muted);
   color: var(--text-primary);
 }
 
 .footer-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.55rem;
+  width: 100%;
 }
 
 .logout-btn {
@@ -360,32 +358,33 @@ async function handleSignOut() {
   padding: 0 0.85rem;
   border-radius: 10px;
   border: 1px solid var(--glass-border);
-  background: transparent;
+  background: var(--layout-sidebar-bg);
   color: var(--text-secondary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
   white-space: nowrap;
 }
 
 .logout-btn:hover {
-  background: var(--input-bg);
+  background: var(--surface-muted);
   color: var(--text-primary);
 }
 
 .main-content {
   flex: 1;
   overflow: hidden;
+  background: var(--layout-content-bg);
 }
 
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;
-    max-width: 280px;
+    max-width: 272px;
     position: fixed;
-    left: -280px;
+    left: -272px;
     z-index: 100;
     transition: left 0.3s ease;
   }

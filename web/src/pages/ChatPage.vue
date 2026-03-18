@@ -745,8 +745,8 @@ function deleteMessage(messageID: string) {
   flex-direction: column;
   gap: 0.85rem;
   align-items: center;
-  /* padding: 1rem; */
-  background: var(--bg-primary);
+  padding: 1rem;
+  background: var(--layout-content-bg);
   color: var(--text-primary);
 }
 
@@ -764,15 +764,8 @@ function deleteMessage(messageID: string) {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 0.5rem;
-  width: 85%;
-  /*border: 1px solid var(--glass-border);
-   border-radius: 24px; 
-  background:
-    radial-gradient(circle at top left, color-mix(in srgb, var(--accent-glow) 65%, transparent), transparent 38%),
-    linear-gradient(180deg, color-mix(in srgb, var(--input-bg) 95%, transparent), color-mix(in srgb, var(--bg-primary) 88%, transparent));
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);*/
+  gap: 1.25rem;
+  width: min(100%, 960px);
 }
 
 .chat-toolbar {
@@ -795,17 +788,17 @@ function deleteMessage(messageID: string) {
 
 .action-btn {
   border: 1px solid var(--input-border);
-  background: color-mix(in srgb, var(--input-bg) 82%, transparent);
+  background: var(--bg-secondary);
   color: var(--text-primary);
   border-radius: 999px;
   padding: 0.55rem 1rem;
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .action-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--input-border));
+  background: var(--surface-muted);
+  border-color: var(--accent-primary);
 }
 
 .action-btn.warning {
@@ -859,7 +852,7 @@ function deleteMessage(messageID: string) {
   padding: 0.25rem 0 0;
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 0.95rem;
 }
 
 .message-row {
@@ -883,23 +876,19 @@ function deleteMessage(messageID: string) {
   gap: 0.85rem;
   padding: 1rem 1.05rem 0.85rem;
   border: 1px solid var(--input-border);
-  border-radius: 22px;
-  background: color-mix(in srgb, var(--input-bg) 92%, transparent);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.08);
+  border-radius: 18px;
+  background: var(--bg-secondary);
 }
 
 .message-row.role-user .message-bubble {
   max-width: min(72%, 34rem);
-  border-bottom-right-radius: 8px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--accent-primary) 26%, var(--input-bg)),
-    color-mix(in srgb, var(--accent-secondary) 18%, var(--input-bg))
-  );
+  border-bottom-right-radius: 6px;
+  background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--input-border));
 }
 
 .message-row.role-assistant .message-bubble {
-  border-bottom-left-radius: 8px;
+  border-bottom-left-radius: 6px;
 }
 
 .message-meta {
@@ -923,9 +912,9 @@ function deleteMessage(messageID: string) {
 
 .thinking-panel {
   padding: 0.9rem 1rem;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--accent-glow) 22%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--accent-primary) 35%, var(--input-border));
+  border-radius: 14px;
+  background: var(--surface-subtle);
+  border: 1px dashed var(--input-border);
 }
 
 .answer-panel {
@@ -952,10 +941,10 @@ function deleteMessage(messageID: string) {
   width: 100%;
   min-height: 22px;
   max-height: 120px;
-  border: none;
+  border: 1px solid var(--input-border);
   outline: none;
   resize: none;
-  background: color-mix(in srgb, var(--bg-primary) 32%, transparent);
+  background: var(--surface-subtle);
   color: var(--text-primary);
   padding: 0.55rem 0.7rem;
   border-radius: 12px;
@@ -986,7 +975,7 @@ function deleteMessage(messageID: string) {
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .tool-btn svg {
@@ -995,10 +984,8 @@ function deleteMessage(messageID: string) {
 }
 
 .tool-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent-glow) 45%, transparent);
+  background: var(--surface-muted);
   color: var(--text-primary);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
 }
 
 .tool-btn:disabled {
@@ -1058,9 +1045,8 @@ function deleteMessage(messageID: string) {
   align-items: center;
   padding: 0.6rem 1rem;
   border: 1px solid var(--input-border);
-  border-radius: 24px;
-  background: color-mix(in srgb, var(--input-bg) 96%, transparent);
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.08);
+  border-radius: 50px;
+  background: var(--bg-secondary);
 }
 
 .message-input {
@@ -1087,20 +1073,18 @@ function deleteMessage(messageID: string) {
   width: 52px;
   height: 52px;
   border: none;
-  border-radius: 50%;
+  border-radius: 50px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  background: var(--accent-primary);
   color: #fff;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
-  box-shadow: 0 14px 28px color-mix(in srgb, var(--accent-glow) 45%, transparent);
+  transition: background 0.2s ease, opacity 0.2s ease;
 }
 
 .send-btn-stop {
-  background: linear-gradient(135deg, #f08b8b, #dd5f5f);
-  box-shadow: 0 14px 28px rgba(221, 95, 95, 0.28);
+  background: #dc2626;
 }
 
 .send-btn svg {
@@ -1111,12 +1095,11 @@ function deleteMessage(messageID: string) {
 }
 
 .send-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 30px color-mix(in srgb, var(--accent-glow) 72%, transparent);
+  background: var(--accent-secondary);
 }
 
 .send-btn-stop:hover:not(:disabled) {
-  box-shadow: 0 16px 30px rgba(221, 95, 95, 0.32);
+  background: #b91c1c;
 }
 
 .send-btn:disabled {
@@ -1162,7 +1145,7 @@ function deleteMessage(messageID: string) {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: color-mix(in srgb, var(--text-secondary) 72%, transparent);
+  color: color-mix(in srgb, var(--text-secondary) 100%, transparent);
 }
 
 :deep(.model-select .el-select__caret) {
@@ -1176,7 +1159,7 @@ function deleteMessage(messageID: string) {
 }
 
 .model-option-name {
-  color: #0b2330;
+  color: var(--text-primary);
   font-weight: 600;
   line-height: 1.25;
 }
@@ -1184,8 +1167,8 @@ function deleteMessage(messageID: string) {
 :global(.chat-model-popper.el-popper) {
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(129, 195, 228, 0.28);
-  box-shadow: 0 18px 40px rgba(9, 31, 42, 0.18);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
 }
 
 :global(.chat-model-popper .el-select-dropdown__wrap) {
@@ -1201,11 +1184,11 @@ function deleteMessage(messageID: string) {
 }
 
 :global(.chat-model-popper .el-select-dropdown__item.is-hovering) {
-  background: rgba(94, 184, 229, 0.08);
+  background: var(--surface-muted);
 }
 
 :global(.chat-model-popper .el-select-dropdown__item.is-selected) {
-  background: rgba(94, 184, 229, 0.18);
+  background: color-mix(in srgb, var(--accent-primary) 12%, var(--bg-secondary));
 }
 
 :deep(.markdown-body) {
@@ -1244,13 +1227,13 @@ function deleteMessage(messageID: string) {
   overflow-x: auto;
   padding: 0.9rem 1rem;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--bg-primary) 78%, transparent);
+  background: var(--surface-subtle);
 }
 
 :deep(.markdown-body code) {
   padding: 0.15rem 0.35rem;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--accent-glow) 38%, transparent);
+  background: var(--surface-muted);
   font-size: 0.92em;
 }
 
@@ -1266,7 +1249,7 @@ function deleteMessage(messageID: string) {
 }
 
 :deep(.markdown-body a) {
-  color: var(--accent-secondary);
+  color: var(--accent-primary);
 }
 
 :deep(.markdown-body hr) {

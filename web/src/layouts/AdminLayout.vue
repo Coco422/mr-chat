@@ -81,12 +81,12 @@ async function handleSignOut() {
 .admin-layout {
   display: flex;
   min-height: 100vh;
-  background: var(--bg-primary);
+  background: var(--layout-content-bg);
 }
 
 .admin-sidebar {
-  width: 280px;
-  background: var(--bg-secondary);
+  width: 272px;
+  background: var(--layout-sidebar-bg);
   border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
@@ -103,7 +103,7 @@ async function handleSignOut() {
 
 .title-wrap h1 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   line-height: 1.2;
   color: var(--text-primary);
 }
@@ -117,11 +117,16 @@ async function handleSignOut() {
 .icon-btn {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+  background: var(--layout-sidebar-bg);
   color: var(--text-primary);
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: var(--surface-muted);
 }
 
 .admin-nav {
@@ -136,22 +141,22 @@ async function handleSignOut() {
   gap: 0.65rem;
   padding: 0.7rem 0.85rem;
   margin-bottom: 0.35rem;
-  border-radius: 8px;
+  border-radius: 12px;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   border: 1px solid transparent;
 }
 
 .nav-item:hover {
-  background: var(--input-bg);
+  background: var(--surface-muted);
   color: var(--text-primary);
 }
 
 .nav-item.active {
   color: var(--text-primary);
-  border-color: var(--input-border);
-  background: var(--input-bg);
+  border-color: var(--glass-border);
+  background: var(--surface-muted);
 }
 
 .nav-dot {
@@ -180,12 +185,13 @@ async function handleSignOut() {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: var(--accent-primary);
-  color: #fff;
+  background: var(--surface-muted);
+  color: var(--text-primary);
   display: grid;
   place-items: center;
   font-size: 0.85rem;
   font-weight: 600;
+  border: 1px solid var(--glass-border);
 }
 
 .user-meta {
@@ -215,13 +221,14 @@ async function handleSignOut() {
 .action-link,
 .action-btn {
   padding: 0.55rem 0.6rem;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 0.82rem;
   text-align: center;
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  background: var(--layout-sidebar-bg);
   color: var(--text-primary);
   text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .action-btn {
@@ -231,12 +238,14 @@ async function handleSignOut() {
 .action-link:hover,
 .action-btn:hover {
   border-color: var(--accent-primary);
+  background: var(--surface-muted);
 }
 
 .admin-main {
   flex: 1;
   min-width: 0;
   overflow: auto;
+  background: var(--layout-content-bg);
 }
 
 @media (max-width: 960px) {
