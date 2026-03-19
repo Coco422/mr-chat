@@ -46,14 +46,24 @@
         <div class="form-row">
           <div class="form-group">
             <label>Channel</label>
-            <el-select v-model="form.channelID" style="width: 100%">
+            <el-select
+              v-model="form.channelID"
+              style="width: 100%"
+              :loading="channelsLoading"
+              @visible-change="handleChannelsVisibleChange"
+            >
               <el-option value="" label="默认路由" />
               <el-option v-for="channel in channels" :key="channel.id" :value="channel.id" :label="channel.name" />
             </el-select>
           </div>
           <div class="form-group">
             <label>Upstream</label>
-            <el-select v-model="form.upstreamID" style="width: 100%">
+            <el-select
+              v-model="form.upstreamID"
+              style="width: 100%"
+              :loading="upstreamsLoading"
+              @visible-change="handleUpstreamsVisibleChange"
+            >
               <el-option value="" label="请选择" />
               <el-option v-for="upstream in upstreams" :key="upstream.id" :value="upstream.id" :label="upstream.name" />
             </el-select>
@@ -73,7 +83,7 @@
 
     <div class="table-card">
       <div class="table-header">
-        <h2>模型列表</h2>
+        <!-- <h2>模型列表</h2> -->
         <button class="refresh-btn" @click="loadData" :disabled="loading">刷新</button>
       </div>
 
@@ -117,8 +127,7 @@ import {
   createAdminModel,
   listAdminChannels,
   listAdminModels,
-  listAdminUpstreams,
-  listAdminUserGroups
+  listAdminUpstreams
 } from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
@@ -128,11 +137,6 @@ interface UpstreamItem {
 }
 
 interface ChannelItem {
-  id: string
-  name: string
-}
-
-interface UserGroupItem {
   id: string
   name: string
 }
@@ -158,8 +162,9 @@ const errorMessage = ref('')
 const showForm = ref(false)
 const upstreams = ref<UpstreamItem[]>([])
 const channels = ref<ChannelItem[]>([])
-const userGroups = ref<UserGroupItem[]>([])
 const items = ref<ModelItem[]>([])
+const upstreamsLoading = ref(false)
+const channelsLoading = ref(false)
 const form = reactive({
   modelKey: '',
   displayName: '',
@@ -171,6 +176,8 @@ const form = reactive({
   upstreamID: '',
   status: 'active'
 })
+let upstreamsRequest: Promise<void> | null = null
+let channelsRequest: Promise<void> | null = null
 
 onMounted(async () => {
   await loadData()
@@ -181,26 +188,77 @@ async function loadData() {
   errorMessage.value = ''
 
   try {
-    const [modelsResponse, upstreamsResponse, channelsResponse, userGroupsResponse] = await Promise.all([
-      listAdminModels<ModelItem[]>(auth.accessToken),
-      listAdminUpstreams<UpstreamItem[]>(auth.accessToken),
-      listAdminChannels<ChannelItem[]>(auth.accessToken),
-      listAdminUserGroups<UserGroupItem[]>(auth.accessToken)
-    ])
-
-    items.value = modelsResponse
-    upstreams.value = upstreamsResponse
-    channels.value = channelsResponse
-    userGroups.value = userGroupsResponse
-
-    if (!form.upstreamID && upstreams.value.length > 0) {
-      form.upstreamID = upstreams.value[0].id
-    }
+    items.value = await listAdminModels<ModelItem[]>(auth.accessToken)
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {
     loading.value = false
   }
+}
+
+async function handleChannelsVisibleChange(visible: boolean) {
+  if (!visible) {
+    return
+  }
+  await ensureChannelsLoaded()
+}
+
+async function handleUpstreamsVisibleChange(visible: boolean) {
+  if (!visible) {
+    return
+  }
+  await ensureUpstreamsLoaded()
+}
+
+async function ensureChannelsLoaded() {
+  if (channels.value.length > 0) {
+    return
+  }
+  if (channelsRequest) {
+    return channelsRequest
+  }
+
+  channelsLoading.value = true
+  channelsRequest = (async () => {
+    try {
+      channels.value = await listAdminChannels<ChannelItem[]>(auth.accessToken)
+    } catch (error) {
+      errorMessage.value = toErrorMessage(error)
+      throw error
+    } finally {
+      channelsLoading.value = false
+      channelsRequest = null
+    }
+  })()
+
+  return channelsRequest
+}
+
+async function ensureUpstreamsLoaded() {
+  if (upstreams.value.length > 0) {
+    return
+  }
+  if (upstreamsRequest) {
+    return upstreamsRequest
+  }
+
+  upstreamsLoading.value = true
+  upstreamsRequest = (async () => {
+    try {
+      upstreams.value = await listAdminUpstreams<UpstreamItem[]>(auth.accessToken)
+      if (!form.upstreamID && upstreams.value.length > 0) {
+        form.upstreamID = upstreams.value[0].id
+      }
+    } catch (error) {
+      errorMessage.value = toErrorMessage(error)
+      throw error
+    } finally {
+      upstreamsLoading.value = false
+      upstreamsRequest = null
+    }
+  })()
+
+  return upstreamsRequest
 }
 
 async function createModel() {

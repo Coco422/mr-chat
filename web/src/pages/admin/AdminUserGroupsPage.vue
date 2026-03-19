@@ -106,7 +106,7 @@
     </div>
 
     <div class="table-card">
-      <h2>分组列表</h2>
+      <!-- <h3>分组列表</h3> -->
       <table v-if="groups.length > 0">
         <thead>
           <tr>
@@ -343,5 +343,12 @@ function toErrorMessage(error: unknown) {
   background: var(--bg-primary);
   border: 1px solid var(--input-border);
   border-radius: 8px;
+}
+
+.table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
 }
 </style>

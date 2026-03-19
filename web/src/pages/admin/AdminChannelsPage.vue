@@ -42,7 +42,7 @@
 
     <div class="table-card">
       <div class="table-header">
-        <h2>渠道列表</h2>
+        <!-- <h2>渠道列表</h2> -->
         <button class="refresh-btn" @click="loadChannels" :disabled="loading">刷新</button>
       </div>
 

@@ -1,35 +1,38 @@
 <template>
   <div class="admin-page">
-    <div class="page-header">
+    <!-- <div class="page-header">
       <h1>用户管理</h1>
-    </div>
+    </div> -->
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
     <div class="form-card">
-      <h2>筛选条件</h2>
-      <form @submit.prevent="loadUsers" class="admin-form">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Keyword</label>
-            <input v-model.trim="filters.keyword" type="text" />
+      <!-- <h2>筛选条件</h2> -->
+      <form @submit.prevent="loadUsers" class="admin-form filter-form">
+        <div class="form-row filter-row">
+          <div class="form-group filter-group">
+            <label class="filter-label">Keyword</label>
+            <input v-model.trim="filters.keyword" type="text" class="filter-control" />
           </div>
-          <div class="form-group">
-            <label>Status</label>
-            <el-select v-model="filters.status" style="width: 100%">
+          <div class="form-group filter-group">
+            <label class="filter-label">Status</label>
+            <el-select v-model="filters.status" class="filter-control">
               <el-option value="" label="all" />
               <el-option value="active" label="active" />
               <el-option value="disabled" label="disabled" />
               <el-option value="pending" label="pending" />
             </el-select>
           </div>
+          <div class="filter-actions">
+            <button type="submit" :disabled="loading" class="submit-btn">查询</button>
+          </div>
         </div>
-        <button type="submit" :disabled="loading" class="submit-btn">查询</button>
+
       </form>
     </div>
 
     <div class="table-card">
-      <h2>用户列表</h2>
+      <!-- <h2>用户列表</h2> -->
       <el-table :data="items" v-loading="loading" stripe>
         <el-table-column type="expand">
           <template #default="{ row }">
@@ -37,7 +40,12 @@
               <div class="action-section">
                 <h3>用户组管理</h3>
                 <form @submit.prevent="assignUserGroup(row.id)" class="inline-form">
-                  <el-select v-model="selectedGroupByUser[row.id]" style="width: 200px">
+                  <el-select
+                    v-model="selectedGroupByUser[row.id]"
+                    style="width: 200px"
+                    :loading="groupsLoading"
+                    @visible-change="handleGroupsVisibleChange"
+                  >
                     <el-option value="" label="未分组" />
                     <el-option v-for="group in groups" :key="group.id" :value="group.id" :label="group.name" />
                   </el-select>
@@ -57,7 +65,13 @@
               <div class="action-section">
                 <h3>限额查询</h3>
                 <div class="inline-form">
-                  <el-select v-model="usageModelByUser[row.id]" style="width: 200px" size="small">
+                  <el-select
+                    v-model="usageModelByUser[row.id]"
+                    style="width: 200px"
+                    size="small"
+                    :loading="modelsLoading"
+                    @visible-change="handleModelsVisibleChange"
+                  >
                     <el-option value="" label="all models" />
                     <el-option v-for="model in models" :key="model.id" :value="model.id" :label="model.display_name" />
                   </el-select>
@@ -99,7 +113,13 @@
               <div class="action-section">
                 <h3>新增限额调整</h3>
                 <form @submit.prevent="createAdjustment(row.id)" class="adjustment-form">
-                  <el-select v-model="adjustmentModelByUser[row.id]" placeholder="model" size="small">
+                  <el-select
+                    v-model="adjustmentModelByUser[row.id]"
+                    placeholder="model"
+                    size="small"
+                    :loading="modelsLoading"
+                    @visible-change="handleModelsVisibleChange"
+                  >
                     <el-option value="" label="all models" />
                     <el-option v-for="model in models" :key="model.id" :value="model.id" :label="model.display_name" />
                   </el-select>
@@ -245,6 +265,8 @@ const items = ref<AdminUser[]>([])
 const total = ref(0)
 const groups = ref<UserGroupItem[]>([])
 const models = ref<ModelItem[]>([])
+const groupsLoading = ref(false)
+const modelsLoading = ref(false)
 const pagination = reactive({
   page: 1,
   pageSize: 20
@@ -264,6 +286,8 @@ const adjustmentMetricByUser = reactive<Record<string, string>>({})
 const adjustmentWindowByUser = reactive<Record<string, string>>({})
 const adjustmentDeltaByUser = reactive<Record<string, string>>({})
 const adjustmentReasonByUser = reactive<Record<string, string>>({})
+let groupsRequest: Promise<void> | null = null
+let modelsRequest: Promise<void> | null = null
 
 onMounted(async () => {
   await reloadAll()
@@ -450,6 +474,45 @@ function toErrorMessage(error: unknown) {
   background: var(--bg-secondary);
 }
 
+.filter-form {
+  gap: 0;
+}
+
+.filter-row {
+  grid-template-columns: minmax(220px, 320px) minmax(180px, 240px) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filter-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-label {
+  width: 52px;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.filter-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.filter-actions .submit-btn {
+  margin-top: 0;
+  padding: 0.35rem 1.1rem;
+  white-space: nowrap;
+}
+
 .action-section {
   margin-bottom: 20px;
   padding-bottom: 20px;
@@ -525,5 +588,30 @@ function toErrorMessage(error: unknown) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .filter-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .filter-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .filter-label {
+    width: auto;
+  }
+
+  .filter-actions {
+    justify-content: stretch;
+  }
+
+  .filter-actions .submit-btn {
+    width: 100%;
+  }
 }
 </style>

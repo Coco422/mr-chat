@@ -1,6 +1,6 @@
 /* 管理页面通用样式 */
 .admin-page {
-  padding: 2rem;
+  padding: 1rem;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -20,7 +20,7 @@
 }
 
 .primary-btn {
-  padding: 0.75rem 1.5rem;
+  padding: 0.45rem 1rem;
   background: var(--accent-primary);
   color: white;
   border: none;
@@ -48,15 +48,22 @@
   background: var(--input-bg);
   border: 1px solid var(--input-border);
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 1rem;
   margin-bottom: 2rem;
 }
 
-.form-card h2, .table-header h2 {
+.form-card h2 {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 1.5rem;
+}
+
+.table-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .admin-form {
@@ -84,7 +91,7 @@
 }
 
 .form-group input, .form-group select {
-  padding: 0.75rem;
+  padding: 0.40rem;
   background: var(--bg-primary);
   border: 1px solid var(--input-border);
   border-radius: 8px;
@@ -122,12 +129,12 @@
 .table-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: right;
   margin-bottom: 1.5rem;
 }
 
 .refresh-btn {
-  padding: 0.5rem 1rem;
+  padding: 0.35rem 1rem;
   background: transparent;
   border: 1px solid var(--input-border);
   border-radius: 8px;

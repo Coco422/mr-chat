@@ -1,37 +1,39 @@
 <template>
   <div class="admin-page">
-    <div class="page-header">
+    <!-- <div class="page-header">
       <h1>审计日志</h1>
-    </div>
+    </div> -->
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
     <div class="form-card">
-      <form @submit.prevent="loadLogs" class="admin-form">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Action</label>
-            <input v-model.trim="filters.action" type="text" />
+      <form @submit.prevent="loadLogs" class="admin-form filter-form">
+        <div class="form-row filter-row">
+          <div class="form-group filter-group">
+            <label class="filter-label">Action</label>
+            <input v-model.trim="filters.action" type="text" class="filter-control" />
           </div>
-          <div class="form-group">
-            <label>Resource Type</label>
-            <input v-model.trim="filters.resourceType" type="text" />
+          <div class="form-group filter-group">
+            <label class="filter-label">Resource</label>
+            <input v-model.trim="filters.resourceType" type="text" class="filter-control" />
           </div>
-          <div class="form-group">
-            <label>Result</label>
-            <el-select v-model="filters.result">
+          <div class="form-group filter-group">
+            <label class="filter-label">Result</label>
+            <el-select v-model="filters.result" class="filter-control">
               <el-option value="" label="全部" />
               <el-option value="success" label="Success" />
               <el-option value="failure" label="Failure" />
             </el-select>
           </div>
+          <div class="filter-actions">
+            <button type="submit" :disabled="loading" class="submit-btn">查询</button>
+          </div>
         </div>
-        <button type="submit" :disabled="loading" class="submit-btn">查询</button>
       </form>
     </div>
 
     <div class="table-card">
-      <h2>日志列表</h2>
+      <!-- <h2>日志列表</h2> -->
       <el-table :data="items" v-loading="loading" stripe>
         <el-table-column prop="action" label="Action" min-width="150" />
         <el-table-column prop="resource_type" label="Resource Type" min-width="150" />
@@ -148,4 +150,63 @@ function formatDate(date: string) {
 
 <style scoped>
 @import '@/styles/admin.css';
+
+.filter-form {
+  gap: 0;
+}
+
+.filter-row {
+  grid-template-columns: minmax(180px, 240px) minmax(220px, 300px) minmax(180px, 220px) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filter-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-label {
+  width: 58px;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.filter-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+}
+
+.filter-actions .submit-btn {
+  margin-top: 0;
+  padding: 0.35rem 1.1rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .filter-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .filter-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .filter-label {
+    width: auto;
+  }
+
+  .filter-actions .submit-btn {
+    width: 100%;
+  }
+}
 </style>
