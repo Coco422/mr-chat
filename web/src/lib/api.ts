@@ -66,9 +66,11 @@ export const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: unknown) => {
-    const originalRequest = axios.isAxiosError(error) ? error.config : null
+    const originalRequest = axios.isAxiosError(error)
+      ? (error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | null)
+      : null
 
-    if (axios.isAxiosError(error) && error.response?.status === 401 && originalRequest) {
+    if (axios.isAxiosError(error) && error.response?.status === 401 && originalRequest && shouldAttemptRefresh(originalRequest)) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject })
@@ -83,6 +85,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true
 
       try {
+        originalRequest._retry = true
         const { useAuthStore } = await import('@/stores/auth')
         const auth = useAuthStore()
         const success = await auth.refreshSession()
@@ -197,4 +200,13 @@ function normalizeAxiosError(error: unknown) {
 
 function getNow() {
   return typeof performance === 'undefined' ? Date.now() : performance.now()
+}
+
+function shouldAttemptRefresh(request: InternalAxiosRequestConfig & { _retry?: boolean }) {
+  if (request._retry) {
+    return false
+  }
+
+  const url = request.url ?? ''
+  return !/^\/auth\/(signin|signup|signout|refresh)(?:\?|$)/.test(url)
 }
