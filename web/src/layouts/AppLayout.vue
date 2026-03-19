@@ -1,13 +1,58 @@
 <template>
   <div class="app-layout">
-    <aside class="sidebar">
+    <aside class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
       <div class="sidebar-header">
-        <h1 class="logo">MrChat</h1>
-        <button class="new-chat-btn" @click="createConversation">
+        <div class="header-top">
+          <h1 class="logo">{{ isSidebarCollapsed ? 'M' : 'MrChat' }}</h1>
+          <div class="header-actions">
+            <button
+              class="icon-btn collapse-btn"
+              @click="toggleSidebar"
+              :title="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+              :aria-label="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path
+                  v-if="isSidebarCollapsed"
+                  d="m9 6 6 6-6 6"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <path
+                  v-else
+                  d="m15 6-6 6 6 6"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <button class="icon-btn theme-btn" @click="toggleTheme" title="切换主题" aria-label="切换主题">
+              <svg v-if="isDark()" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="5" stroke-width="2"/><line x1="12" y1="1" x2="12" y2="3" stroke-width="2"/>
+                <line x1="12" y1="21" x2="12" y2="23" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-width="2"/>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke-width="2"/>
+                <line x1="21" y1="12" x2="23" y2="12" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-width="2"/>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-width="2"/>
+              </svg>
+              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-width="2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <button
+          class="new-chat-btn"
+          :class="{ compact: isSidebarCollapsed }"
+          @click="createConversation"
+          :title="isSidebarCollapsed ? '新对话' : undefined"
+          aria-label="新对话"
+        >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          新对话
+          <span v-if="!isSidebarCollapsed">新对话</span>
         </button>
       </div>
 
@@ -18,68 +63,60 @@
           :to="`/chat/${conv.id}`"
           class="conversation-item"
           :class="{ active: currentConversationId === conv.id }"
+          :title="conv.title || '新对话'"
         >
           <div class="conv-title">{{ conv.title || '新对话' }}</div>
-          <div class="conv-meta">{{ conv.message_count }} 条消息</div>
+          <!-- <div class="conv-meta">{{ conv.message_count }} 条消息</div> -->
         </RouterLink>
         <div v-if="conversations.length === 0" class="empty-state">暂无对话</div>
       </div>
 
       <nav class="nav-menu">
-        <RouterLink to="/chat" class="nav-item">
+        <RouterLink to="/chat" class="nav-item" :title="isSidebarCollapsed ? '对话' : undefined">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2"/>
           </svg>
-          对话
+          <span class="nav-label">对话</span>
         </RouterLink>
-        <RouterLink to="/usage" class="nav-item">
+        <RouterLink to="/usage" class="nav-item" :title="isSidebarCollapsed ? '用量' : undefined">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <line x1="12" y1="1" x2="12" y2="23" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-width="2"/>
           </svg>
-          用量
+          <span class="nav-label">用量</span>
         </RouterLink>
-        <RouterLink to="/settings/profile" class="nav-item">
+        <RouterLink to="/settings/profile" class="nav-item" :title="isSidebarCollapsed ? '设置' : undefined">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <circle cx="12" cy="12" r="3" stroke-width="2"/><path d="M12 1v6m0 6v6" stroke-width="2"/>
             <path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24m0-16.97-4.24 4.24m-5.66 5.66L4.93 19.07" stroke-width="2"/>
           </svg>
-          设置
+          <span class="nav-label">设置</span>
         </RouterLink>
-        <RouterLink to="/admin/upstreams" class="nav-item">
+        <RouterLink to="/admin/upstreams" class="nav-item" :title="isSidebarCollapsed ? '管理' : undefined">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke-width="2"/><line x1="9" y1="9" x2="15" y2="9" stroke-width="2"/>
             <line x1="9" y1="15" x2="15" y2="15" stroke-width="2"/>
           </svg>
-          管理
+          <span class="nav-label">管理</span>
         </RouterLink>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-info" v-if="auth.user">
-          <div class="user-avatar">{{ auth.user.username[0].toUpperCase() }}</div>
-          <div class="user-details">
-            <div class="user-name">{{ auth.user.username }}</div>
-            <div class="user-role">{{ auth.user.role }}</div>
+        <div class="footer-row" v-if="auth.user">
+          <div class="user-info">
+            <div class="user-avatar">{{ auth.user.username[0].toUpperCase() }}</div>
+            <div class="user-details">
+              <div class="user-name">{{ auth.user.username }}</div>
+              <div class="user-role">{{ auth.user.role }}</div>
+            </div>
           </div>
+          <button class="logout-btn" @click="handleSignOut" title="退出登录">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke-width="2"/>
+              <line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/>
+            </svg>
+            <span v-if="!isSidebarCollapsed">退出</span>
+          </button>
         </div>
-        <button class="icon-btn" @click="toggleTheme" title="切换主题">
-          <svg v-if="isDark()" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <circle cx="12" cy="12" r="5" stroke-width="2"/><line x1="12" y1="1" x2="12" y2="3" stroke-width="2"/>
-            <line x1="12" y1="21" x2="12" y2="23" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-width="2"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke-width="2"/>
-            <line x1="21" y1="12" x2="23" y2="12" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-width="2"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-width="2"/>
-          </svg>
-          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-width="2"/>
-          </svg>
-        </button>
-        <button class="icon-btn" @click="handleSignOut" title="退出登录">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke-width="2"/>
-            <line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/>
-          </svg>
-        </button>
       </div>
     </aside>
 
@@ -94,27 +131,22 @@ import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
-import { apiRequest } from '@/lib/api'
-
-interface ConversationSummary {
-  id: string
-  title: string
-  model_id: string | null
-  message_count: number
-  status: string
-}
+import { createConversation as createConversationRequest, listConversations, type ConversationSummary } from '@/api/chat'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 const { toggleTheme, isDark } = useTheme()
 const conversations = ref<ConversationSummary[]>([])
+const isSidebarCollapsed = ref(false)
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'mrchat:sidebar:collapsed'
 
 const currentConversationId = computed(() =>
   typeof route.params.conversationId === 'string' ? route.params.conversationId : ''
 )
 
 onMounted(async () => {
+  isSidebarCollapsed.value = readSidebarCollapsedState()
   if (auth.isAuthenticated && !auth.user) {
     await auth.fetchMe()
   }
@@ -128,10 +160,7 @@ onUnmounted(() => {
 
 async function loadConversations() {
   try {
-    const { data } = await apiRequest<ConversationSummary[]>('/conversations', {
-      accessToken: auth.accessToken
-    })
-    conversations.value = data
+    conversations.value = await listConversations(auth.accessToken)
   } catch (error) {
     console.error('Failed to load conversations:', error)
   }
@@ -139,10 +168,9 @@ async function loadConversations() {
 
 async function createConversation() {
   try {
-    const { data } = await apiRequest<ConversationSummary>('/conversations', {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: { title: '新对话', model_id: null }
+    const data = await createConversationRequest(auth.accessToken, {
+      title: '新对话',
+      model_id: null
     })
     await loadConversations()
     router.push(`/chat/${data.id}`)
@@ -155,89 +183,141 @@ async function handleSignOut() {
   await auth.signOut()
   router.push({ name: 'login' })
 }
+
+function toggleSidebar() {
+  isSidebarCollapsed.value = !isSidebarCollapsed.value
+  persistSidebarCollapsedState(isSidebarCollapsed.value)
+}
+
+function readSidebarCollapsedState() {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function persistSidebarCollapsedState(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(collapsed))
+  } catch {
+    // Ignore storage write failures and keep the in-memory state.
+  }
+}
 </script>
 
 <style scoped>
 .app-layout {
   display: flex;
   height: 100vh;
-  background: var(--bg-primary);
+  background: var(--layout-content-bg);
 }
 
 .sidebar {
-  width: 280px;
-  background: var(--bg-secondary);
+  width: 254px;
+  flex-shrink: 0;
+  background: var(--layout-sidebar-bg);
   border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
+  transition: width 0.24s ease;
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: 84px;
 }
 
 .sidebar-header {
-  padding: 1.5rem 1rem;
+  padding: 1.25rem 1rem;
   border-bottom: 1px solid var(--glass-border);
 }
 
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .logo {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 1rem;
+  margin: 0;
+}
+
+.theme-btn {
+  width: 32px;
+  height: 32px;
 }
 
 .new-chat-btn {
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 0.4rem 0.5rem;
   background: var(--accent-primary);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, opacity 0.2s ease;
 }
 
 .new-chat-btn:hover {
   background: var(--accent-secondary);
-  transform: translateY(-1px);
+}
+
+.new-chat-btn.compact {
+  padding: 0.55rem;
 }
 
 .conversations-list {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
 }
 
 .conversation-item {
   display: block;
-  padding: 0.875rem 1rem;
-  margin-bottom: 0.25rem;
-  border-radius: 8px;
+  padding: 0.4rem 0.4rem;
+  border-radius: 6px;
   text-decoration: none;
   color: var(--text-secondary);
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
 }
 
 .conversation-item:hover {
-  background: var(--input-bg);
+  background: var(--surface-muted);
   color: var(--text-primary);
 }
 
 .conversation-item.active {
-  background: var(--input-bg);
+  background: color-mix(in srgb, var(--accent-primary) 15%, var(--surface-muted));
   color: var(--text-primary);
-  border-left: 3px solid var(--accent-primary);
 }
 
 .conv-title {
   font-size: 0.9rem;
   font-weight: 500;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -256,59 +336,72 @@ async function handleSignOut() {
 }
 
 .nav-menu {
-  padding: 0.5rem;
-  border-top: 1px solid var(--glass-border);
+  padding: 0.5rem 0.75rem;
+  /* border-top: 1px solid var(--glass-border); */
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 0.6rem;
   margin-bottom: 0.25rem;
-  border-radius: 8px;
+  border-radius: 12px;
   text-decoration: none;
   color: var(--text-secondary);
   font-size: 0.9rem;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 .nav-item:hover {
-  background: var(--input-bg);
+  background: var(--surface-muted);
   color: var(--text-primary);
 }
 
 .nav-item.router-link-active {
-  background: var(--input-bg);
+  background: var(--surface-muted);
   color: var(--accent-primary);
+}
+
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-footer {
   padding: 1rem;
   border-top: 1px solid var(--glass-border);
+}
+
+.footer-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
 }
 
 .user-info {
-  flex: 1;
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .user-avatar {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: var(--accent-primary);
-  color: white;
+  background: var(--surface-muted);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
   font-size: 0.9rem;
+  border: 1px solid var(--glass-border);
 }
 
 .user-details {
@@ -333,39 +426,129 @@ async function handleSignOut() {
 .icon-btn {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  background: transparent;
+  border-radius: 10px;
+  background: var(--layout-sidebar-bg);
   border: 1px solid var(--glass-border);
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .icon-btn:hover {
-  background: var(--input-bg);
+  background: var(--surface-muted);
+  color: var(--text-primary);
+}
+
+.logout-btn {
+  height: 32px;
+  padding: 0 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--layout-sidebar-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.logout-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.logout-btn:hover {
+  background: var(--surface-muted);
   color: var(--text-primary);
 }
 
 .main-content {
   flex: 1;
   overflow: hidden;
+  background: var(--layout-content-bg);
+}
+
+.sidebar.collapsed .sidebar-header {
+  padding: 1rem 0.75rem;
+}
+
+.sidebar.collapsed .header-top {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.sidebar.collapsed .header-actions {
+  flex-direction: column;
+}
+
+.sidebar.collapsed .conversations-list {
+  display: none;
+}
+
+.sidebar.collapsed .new-chat-btn.compact {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  margin: 0 auto;
+  border-radius: 10px;
+}
+
+.sidebar.collapsed .nav-menu {
+  padding: 0.75rem 0.55rem;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 0.7rem 0;
+}
+
+.sidebar.collapsed .nav-label {
+  display: none;
+}
+
+.sidebar.collapsed .footer-row {
+  flex-direction: column;
+}
+
+.sidebar.collapsed .user-info {
+  justify-content: center;
+}
+
+.sidebar.collapsed .user-details {
+  display: none;
+}
+
+.sidebar.collapsed .logout-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 0;
 }
 
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;
-    max-width: 280px;
+    max-width: 272px;
     position: fixed;
-    left: -280px;
+    left: -272px;
     z-index: 100;
     transition: left 0.3s ease;
   }
 
   .sidebar.open {
     left: 0;
+  }
+
+  .sidebar.collapsed {
+    width: 100%;
+    max-width: 272px;
   }
 }
 </style>

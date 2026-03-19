@@ -1,135 +1,199 @@
 <template>
   <div class="admin-page">
-    <div class="page-header">
+    <!-- <div class="page-header">
       <h1>用户管理</h1>
-    </div>
+    </div> -->
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-    <form @submit.prevent="loadUsers">
-      <div>
-        <label>
-          Keyword
-          <input v-model.trim="filters.keyword" type="text" />
-        </label>
-      </div>
-      <div>
-        <label>
-          状态
-          <select v-model="filters.status">
-            <option value="">all</option>
-            <option value="active">active</option>
-            <option value="disabled">disabled</option>
-            <option value="pending">pending</option>
-          </select>
-        </label>
-      </div>
-      <button type="submit" :disabled="loading">查询</button>
-    </form>
+    <div class="form-card">
+      <!-- <h2>筛选条件</h2> -->
+      <form @submit.prevent="loadUsers" class="admin-form filter-form">
+        <div class="form-row filter-row">
+          <div class="form-group filter-group">
+            <label class="filter-label">Keyword</label>
+            <input v-model.trim="filters.keyword" type="text" class="filter-control" />
+          </div>
+          <div class="form-group filter-group">
+            <label class="filter-label">Status</label>
+            <el-select v-model="filters.status" class="filter-control">
+              <el-option value="" label="all" />
+              <el-option value="active" label="active" />
+              <el-option value="disabled" label="disabled" />
+              <el-option value="pending" label="pending" />
+            </el-select>
+          </div>
+          <div class="filter-actions">
+            <button type="submit" :disabled="loading" class="submit-btn">查询</button>
+          </div>
+        </div>
 
-    <hr />
+      </form>
+    </div>
 
-    <p v-if="loading">加载中...</p>
-    <ul v-else-if="items.length > 0">
-      <li v-for="item in items" :key="item.id">
-        <div>
-          {{ item.username }} / {{ item.email }} / {{ item.role }} / quota={{ item.quota }} / group={{ item.user_group?.name || item.user_group_id || '-' }}
-        </div>
-        <form @submit.prevent="assignUserGroup(item.id)">
-          <label>
-            user group
-            <select v-model="selectedGroupByUser[item.id]">
-              <option value="">未分组</option>
-              <option v-for="group in groups" :key="group.id" :value="group.id">
-                {{ group.name }}
-              </option>
-            </select>
-          </label>
-          <button type="submit" :disabled="assigningUserID === item.id">更新分组</button>
-        </form>
-        <form @submit.prevent="adjustQuota(item.id)">
-          <label>
-            delta
-            <input v-model.trim="quotaDelta[item.id]" type="number" />
-          </label>
-          <label>
-            reason
-            <input v-model.trim="quotaReason[item.id]" type="text" />
-          </label>
-          <button type="submit" :disabled="submittingUserID === item.id">调额</button>
-        </form>
-        <div>
-          <label>
-            usage model
-            <select v-model="usageModelByUser[item.id]">
-              <option value="">all models</option>
-              <option v-for="model in models" :key="model.id" :value="model.id">
-                {{ model.display_name }}
-              </option>
-            </select>
-          </label>
-          <button type="button" @click="loadLimitUsage(item.id)" :disabled="loadingUsageUserID === item.id">加载限额用量</button>
-          <button type="button" @click="loadAdjustments(item.id)" :disabled="loadingAdjustmentUserID === item.id">加载调整记录</button>
-        </div>
-        <div v-if="usageReports[item.id]">
-          <div>policy source={{ usageReports[item.id]?.effective_policy.source || 'none' }}</div>
-          <div>hour requests: used={{ usageReports[item.id]?.usage.hour.requests }} / adj={{ usageReports[item.id]?.adjustments.hour.requests }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.hour.requests) }}</div>
-          <div>hour tokens: used={{ usageReports[item.id]?.usage.hour.tokens }} / adj={{ usageReports[item.id]?.adjustments.hour.tokens }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.hour.tokens) }}</div>
-          <div>week requests: used={{ usageReports[item.id]?.usage.week.requests }} / adj={{ usageReports[item.id]?.adjustments.week.requests }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.week.requests) }}</div>
-          <div>week tokens: used={{ usageReports[item.id]?.usage.week.tokens }} / adj={{ usageReports[item.id]?.adjustments.week.tokens }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.week.tokens) }}</div>
-          <div>lifetime requests: used={{ usageReports[item.id]?.usage.lifetime.requests }} / adj={{ usageReports[item.id]?.adjustments.lifetime.requests }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.lifetime.requests) }}</div>
-          <div>lifetime tokens: used={{ usageReports[item.id]?.usage.lifetime.tokens }} / adj={{ usageReports[item.id]?.adjustments.lifetime.tokens }} / remaining={{ remainingLabel(usageReports[item.id]?.remaining.lifetime.tokens) }}</div>
-        </div>
-        <form @submit.prevent="createAdjustment(item.id)">
-          <label>
-            adjust model
-            <select v-model="adjustmentModelByUser[item.id]">
-              <option value="">all models</option>
-              <option v-for="model in models" :key="model.id" :value="model.id">
-                {{ model.display_name }}
-              </option>
-            </select>
-          </label>
-          <label>
-            metric
-            <select v-model="adjustmentMetricByUser[item.id]">
-              <option value="request_count">request_count</option>
-              <option value="total_tokens">total_tokens</option>
-            </select>
-          </label>
-          <label>
-            window
-            <select v-model="adjustmentWindowByUser[item.id]">
-              <option value="rolling_hour">rolling_hour</option>
-              <option value="rolling_week">rolling_week</option>
-              <option value="lifetime">lifetime</option>
-            </select>
-          </label>
-          <label>
-            delta
-            <input v-model.trim="adjustmentDeltaByUser[item.id]" type="number" />
-          </label>
-          <label>
-            reason
-            <input v-model.trim="adjustmentReasonByUser[item.id]" type="text" />
-          </label>
-          <button type="submit" :disabled="submittingAdjustmentUserID === item.id">新增限额调整</button>
-        </form>
-        <ul v-if="(adjustmentsByUser[item.id] ?? []).length > 0">
-          <li v-for="adjustment in adjustmentsByUser[item.id]" :key="adjustment.id">
-            {{ adjustment.metric_type }} / {{ adjustment.window_type }} / delta={{ adjustment.delta }} / model={{ adjustment.model_id || 'all' }} / expires_at={{ adjustment.expires_at || '-' }}
-          </li>
-        </ul>
-      </li>
-    </ul>
-    <p v-else>暂无用户</p>
+    <div class="table-card">
+      <!-- <h2>用户列表</h2> -->
+      <el-table :data="items" v-loading="loading" stripe>
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div class="expand-content">
+              <div class="action-section">
+                <h3>用户组管理</h3>
+                <form @submit.prevent="assignUserGroup(row.id)" class="inline-form">
+                  <el-select
+                    v-model="selectedGroupByUser[row.id]"
+                    style="width: 200px"
+                    :loading="groupsLoading"
+                    @visible-change="handleGroupsVisibleChange"
+                  >
+                    <el-option value="" label="未分组" />
+                    <el-option v-for="group in groups" :key="group.id" :value="group.id" :label="group.name" />
+                  </el-select>
+                  <el-button type="primary" native-type="submit" :loading="assigningUserID === row.id" size="small">更新</el-button>
+                </form>
+              </div>
+
+              <div class="action-section">
+                <h3>配额调整</h3>
+                <form @submit.prevent="adjustQuota(row.id)" class="inline-form">
+                  <el-input v-model.trim="quotaDelta[row.id]" type="number" placeholder="delta" style="width: 120px" size="small" />
+                  <el-input v-model.trim="quotaReason[row.id]" placeholder="reason" style="width: 200px" size="small" />
+                  <el-button type="primary" native-type="submit" :loading="submittingUserID === row.id" size="small">调额</el-button>
+                </form>
+              </div>
+
+              <div class="action-section">
+                <h3>限额查询</h3>
+                <div class="inline-form">
+                  <el-select
+                    v-model="usageModelByUser[row.id]"
+                    style="width: 200px"
+                    size="small"
+                    :loading="modelsLoading"
+                    @visible-change="handleModelsVisibleChange"
+                  >
+                    <el-option value="" label="all models" />
+                    <el-option v-for="model in models" :key="model.id" :value="model.id" :label="model.display_name" />
+                  </el-select>
+                  <el-button @click="loadLimitUsage(row.id)" :loading="loadingUsageUserID === row.id" size="small">加载限额</el-button>
+                  <el-button @click="loadAdjustments(row.id)" :loading="loadingAdjustmentUserID === row.id" size="small">调整记录</el-button>
+                </div>
+
+                <div v-if="usageReports[row.id]" class="usage-report">
+                  <div class="report-header">限额用量报告 (来源: {{ usageReports[row.id]?.effective_policy.source || 'none' }})</div>
+                  <div class="report-grid">
+                    <div class="report-item">
+                      <span class="label">Hour Requests:</span>
+                      <span>{{ usageReports[row.id]?.usage.hour.requests }} / adj={{ usageReports[row.id]?.adjustments.hour.requests }} / remain={{ remainingLabel(usageReports[row.id]?.remaining.hour.requests) }}</span>
+                    </div>
+                    <div class="report-item">
+                      <span class="label">Hour Tokens:</span>
+                      <span>{{ usageReports[row.id]?.usage.hour.tokens }} / adj={{ usageReports[row.id]?.adjustments.hour.tokens }} / remain={{ remainingLabel(usageReports[row.id]?.remaining.hour.tokens) }}</span>
+                    </div>
+                    <div class="report-item">
+                      <span class="label">Week Requests:</span>
+                      <span>{{ usageReports[row.id]?.usage.week.requests }} / adj={{ usageReports[row.id]?.adjustments.week.requests }} / remain={{ remainingLabel(usageReports[row.id]?.remaining.week.requests) }}</span>
+                    </div>
+                    <div class="report-item">
+                      <span class="label">Week Tokens:</span>
+                      <span>{{ usageReports[row.id]?.usage.week.tokens }} / adj={{ usageReports[row.id]?.adjustments.week.tokens }} / remain={{ remainingLabel(usageReports[row.id]?.remaining.week.tokens) }}</span>
+                    </div>
+                    <div class="report-item">
+                      <span class="label">Lifetime Requests:</span>
+                      <span>{{ usageReports[row.id]?.usage.lifetime.requests }} / adj={{ usageReports[row.id]?.adjustments.lifetime.requests }} / remain={{ remainingLabel(usageReports[row.id]?.remaining.lifetime.requests) }}</span>
+                    </div>
+                    <div class="report-item">
+                      <span class="label">Lifetime Tokens:</span>
+                      <span>{{ usageReports[row.id]?.usage.lifetime.tokens }} / adj={{ usageReports[row.id]?.adjustments.lifetime.tokens }} / remain={{ remainingLabel(usageReports[row.id]?.remaining.lifetime.tokens) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="action-section">
+                <h3>新增限额调整</h3>
+                <form @submit.prevent="createAdjustment(row.id)" class="adjustment-form">
+                  <el-select
+                    v-model="adjustmentModelByUser[row.id]"
+                    placeholder="model"
+                    size="small"
+                    :loading="modelsLoading"
+                    @visible-change="handleModelsVisibleChange"
+                  >
+                    <el-option value="" label="all models" />
+                    <el-option v-for="model in models" :key="model.id" :value="model.id" :label="model.display_name" />
+                  </el-select>
+                  <el-select v-model="adjustmentMetricByUser[row.id]" placeholder="metric" size="small">
+                    <el-option value="request_count" label="request_count" />
+                    <el-option value="total_tokens" label="total_tokens" />
+                  </el-select>
+                  <el-select v-model="adjustmentWindowByUser[row.id]" placeholder="window" size="small">
+                    <el-option value="rolling_hour" label="rolling_hour" />
+                    <el-option value="rolling_week" label="rolling_week" />
+                    <el-option value="lifetime" label="lifetime" />
+                  </el-select>
+                  <el-input v-model.trim="adjustmentDeltaByUser[row.id]" type="number" placeholder="delta" size="small" style="width: 120px" />
+                  <el-input v-model.trim="adjustmentReasonByUser[row.id]" placeholder="reason" size="small" style="width: 200px" />
+                  <el-button type="primary" native-type="submit" :loading="submittingAdjustmentUserID === row.id" size="small">新增</el-button>
+                </form>
+
+                <ul v-if="(adjustmentsByUser[row.id] ?? []).length > 0" class="adjustment-list">
+                  <li v-for="adjustment in adjustmentsByUser[row.id]" :key="adjustment.id">
+                    {{ adjustment.metric_type }} / {{ adjustment.window_type }} / delta={{ adjustment.delta }} / model={{ adjustment.model_id || 'all' }} / expires_at={{ adjustment.expires_at || '-' }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="username" label="用户名" min-width="150" />
+        <el-table-column prop="email" label="邮箱" min-width="200" />
+        <el-table-column prop="role" label="角色" width="100" />
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <span class="status-badge" :class="row.status">{{ row.status }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="配额" width="180">
+          <template #default="{ row }">{{ row.used_quota }} / {{ row.quota }}</template>
+        </el-table-column>
+        <el-table-column label="用户组" min-width="120">
+          <template #default="{ row }">{{ row.user_group?.name || '-' }}</template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无用户" />
+        </template>
+      </el-table>
+
+      <el-pagination
+        v-if="total > 0"
+        v-model:current-page="pagination.page"
+        v-model:page-size="pagination.pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="loadUsers"
+        @size-change="loadUsers"
+        style="margin-top: 16px; justify-content: flex-end"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import {
+  createAdminUserLimitAdjustment,
+  getAdminUserLimitUsage,
+  listAdminModels,
+  listAdminUserGroups,
+  listAdminUserLimitAdjustments,
+  listAdminUsers,
+  updateAdminUserGroup,
+  updateAdminUserQuota
+} from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
 interface AdminUser {
@@ -198,8 +262,15 @@ const loadingAdjustmentUserID = ref('')
 const submittingAdjustmentUserID = ref('')
 const errorMessage = ref('')
 const items = ref<AdminUser[]>([])
+const total = ref(0)
 const groups = ref<UserGroupItem[]>([])
 const models = ref<ModelItem[]>([])
+const groupsLoading = ref(false)
+const modelsLoading = ref(false)
+const pagination = reactive({
+  page: 1,
+  pageSize: 20
+})
 const filters = reactive({
   keyword: '',
   status: ''
@@ -215,32 +286,12 @@ const adjustmentMetricByUser = reactive<Record<string, string>>({})
 const adjustmentWindowByUser = reactive<Record<string, string>>({})
 const adjustmentDeltaByUser = reactive<Record<string, string>>({})
 const adjustmentReasonByUser = reactive<Record<string, string>>({})
+let groupsRequest: Promise<void> | null = null
+let modelsRequest: Promise<void> | null = null
 
 onMounted(async () => {
-  await reloadAll()
+  await loadUsers()
 })
-
-async function reloadAll() {
-  await Promise.all([loadUsers(), loadReferenceData()])
-}
-
-async function loadReferenceData() {
-  try {
-    const [groupResponse, modelResponse] = await Promise.all([
-      apiRequest<UserGroupItem[]>('/admin/user-groups', {
-        accessToken: auth.accessToken
-      }),
-      apiRequest<ModelItem[]>('/admin/models', {
-        accessToken: auth.accessToken
-      })
-    ])
-
-    groups.value = groupResponse.data
-    models.value = modelResponse.data
-  } catch (error) {
-    errorMessage.value = toErrorMessage(error)
-  }
-}
 
 async function loadUsers() {
   loading.value = true
@@ -248,8 +299,8 @@ async function loadUsers() {
 
   try {
     const params = new URLSearchParams({
-      page: '1',
-      page_size: '50'
+      page: String(pagination.page),
+      page_size: String(pagination.pageSize)
     })
     if (filters.keyword) {
       params.set('keyword', filters.keyword)
@@ -258,10 +309,9 @@ async function loadUsers() {
       params.set('status', filters.status)
     }
 
-    const { data } = await apiRequest<AdminUser[]>(`/admin/users?${params.toString()}`, {
-      accessToken: auth.accessToken
-    })
+    const data = await listAdminUsers<AdminUser[]>(auth.accessToken, params.toString())
     items.value = data
+    total.value = data.length
     for (const item of data) {
       selectedGroupByUser[item.id] = item.user_group_id ?? ''
       usageModelByUser[item.id] = usageModelByUser[item.id] ?? ''
@@ -278,18 +328,74 @@ async function loadUsers() {
   }
 }
 
+async function handleGroupsVisibleChange(visible: boolean) {
+  if (!visible) {
+    return
+  }
+  await ensureGroupsLoaded()
+}
+
+async function handleModelsVisibleChange(visible: boolean) {
+  if (!visible) {
+    return
+  }
+  await ensureModelsLoaded()
+}
+
+async function ensureGroupsLoaded() {
+  if (groups.value.length > 0) {
+    return
+  }
+  if (groupsRequest) {
+    return groupsRequest
+  }
+
+  groupsLoading.value = true
+  groupsRequest = (async () => {
+    try {
+      groups.value = await listAdminUserGroups<UserGroupItem[]>(auth.accessToken)
+    } catch (error) {
+      errorMessage.value = toErrorMessage(error)
+      throw error
+    } finally {
+      groupsLoading.value = false
+      groupsRequest = null
+    }
+  })()
+
+  return groupsRequest
+}
+
+async function ensureModelsLoaded() {
+  if (models.value.length > 0) {
+    return
+  }
+  if (modelsRequest) {
+    return modelsRequest
+  }
+
+  modelsLoading.value = true
+  modelsRequest = (async () => {
+    try {
+      models.value = await listAdminModels<ModelItem[]>(auth.accessToken)
+    } catch (error) {
+      errorMessage.value = toErrorMessage(error)
+      throw error
+    } finally {
+      modelsLoading.value = false
+      modelsRequest = null
+    }
+  })()
+
+  return modelsRequest
+}
+
 async function assignUserGroup(userID: string) {
   assigningUserID.value = userID
   errorMessage.value = ''
 
   try {
-    await apiRequest(`/admin/users/${userID}/group`, {
-      method: 'PUT',
-      accessToken: auth.accessToken,
-      body: {
-        user_group_id: selectedGroupByUser[userID] || null
-      }
-    })
+    await updateAdminUserGroup(auth.accessToken, userID, selectedGroupByUser[userID] || null)
 
     await loadUsers()
   } catch (error) {
@@ -304,14 +410,12 @@ async function adjustQuota(userID: string) {
   errorMessage.value = ''
 
   try {
-    await apiRequest(`/admin/users/${userID}/quota`, {
-      method: 'PUT',
-      accessToken: auth.accessToken,
-      body: {
-        delta: Number(quotaDelta[userID] || 0),
-        reason: quotaReason[userID] || ''
-      }
-    })
+    await updateAdminUserQuota(
+      auth.accessToken,
+      userID,
+      Number(quotaDelta[userID] || 0),
+      quotaReason[userID] || ''
+    )
 
     quotaDelta[userID] = ''
     quotaReason[userID] = ''
@@ -328,16 +432,11 @@ async function loadLimitUsage(userID: string) {
   errorMessage.value = ''
 
   try {
-    const params = new URLSearchParams()
-    if (usageModelByUser[userID]) {
-      params.set('model_id', usageModelByUser[userID])
-    }
-
-    const suffix = params.size > 0 ? `?${params.toString()}` : ''
-    const { data } = await apiRequest<UsageReport>(`/admin/users/${userID}/limit-usage${suffix}`, {
-      accessToken: auth.accessToken
-    })
-    usageReports[userID] = data
+    usageReports[userID] = await getAdminUserLimitUsage<UsageReport>(
+      auth.accessToken,
+      userID,
+      usageModelByUser[userID] || undefined
+    )
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {
@@ -358,10 +457,11 @@ async function loadAdjustments(userID: string) {
       params.set('model_id', usageModelByUser[userID])
     }
 
-    const { data } = await apiRequest<UserLimitAdjustment[]>(`/admin/users/${userID}/limit-adjustments?${params.toString()}`, {
-      accessToken: auth.accessToken
-    })
-    adjustmentsByUser[userID] = data
+    adjustmentsByUser[userID] = await listAdminUserLimitAdjustments<UserLimitAdjustment[]>(
+      auth.accessToken,
+      userID,
+      params.toString()
+    )
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {
@@ -374,16 +474,12 @@ async function createAdjustment(userID: string) {
   errorMessage.value = ''
 
   try {
-    await apiRequest(`/admin/users/${userID}/limit-adjustments`, {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: {
-        model_id: adjustmentModelByUser[userID] || null,
-        metric_type: adjustmentMetricByUser[userID] || 'request_count',
-        window_type: adjustmentWindowByUser[userID] || 'rolling_hour',
-        delta: Number(adjustmentDeltaByUser[userID] || 0),
-        reason: adjustmentReasonByUser[userID] || null
-      }
+    await createAdminUserLimitAdjustment(auth.accessToken, userID, {
+      model_id: adjustmentModelByUser[userID] || null,
+      metric_type: adjustmentMetricByUser[userID] || 'request_count',
+      window_type: adjustmentWindowByUser[userID] || 'rolling_hour',
+      delta: Number(adjustmentDeltaByUser[userID] || 0),
+      reason: adjustmentReasonByUser[userID] || null
     })
 
     adjustmentDeltaByUser[userID] = ''
@@ -417,44 +513,149 @@ function toErrorMessage(error: unknown) {
 <style scoped>
 @import '@/styles/admin.css';
 
-.inline-form {
-  display: flex;
+.expand-content {
+  padding: 16px 48px;
+  background: var(--bg-secondary);
+}
+
+.filter-form {
+  gap: 0;
+}
+
+.filter-row {
+  grid-template-columns: minmax(220px, 320px) minmax(180px, 240px) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filter-group {
+  flex-direction: row;
+  align-items: center;
   gap: 0.5rem;
+}
+
+.filter-label {
+  width: 52px;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.filter-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-start;
   align-items: center;
 }
 
-.small-input {
-  padding: 0.5rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--input-border);
-  border-radius: 6px;
+.filter-actions .submit-btn {
+  margin-top: 0;
+  padding: 0.35rem 1.1rem;
+  white-space: nowrap;
+}
+
+.action-section {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--input-border);
+}
+
+.action-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.action-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
   color: var(--text-primary);
-  font-size: 0.85rem;
-  width: 80px;
+  font-weight: 600;
 }
 
-.small-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
-.small-btn {
-  padding: 0.5rem 0.75rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.usage-report {
+  margin-top: 12px;
+  border: 1px dashed var(--input-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--bg-primary);
 }
 
-.small-btn:hover:not(:disabled) {
-  background: var(--accent-secondary);
+.report-header {
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
-.small-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px;
+}
+
+.report-item {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.report-item .label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.adjustment-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.adjustment-list {
+  margin: 12px 0 0 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .filter-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .filter-group {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .filter-label {
+    width: auto;
+  }
+
+  .filter-actions {
+    justify-content: stretch;
+  }
+
+  .filter-actions .submit-btn {
+    width: 100%;
+  }
 }
 </style>

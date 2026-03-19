@@ -41,7 +41,7 @@
 
         <div class="form-row">
           <div class="form-group">
-            <label>状态</label>
+            <label>Status</label>
             <el-select v-model="form.status">
               <el-option value="active" label="Active" />
               <el-option value="disabled" label="Disabled" />
@@ -68,8 +68,8 @@
 
     <div class="table-card">
       <div class="table-header">
-        <h2>上游列表</h2>
-        <button class="refresh-btn" @click="loadUpstreams" :disabled="loading">刷新</button>
+        <!-- <h2>上游列表</h2> -->
+        <el-button class="refresh-btn" @click="loadUpstreams" :disabled="loading">刷新</el-button>
       </div>
 
       <p v-if="loading" class="loading">加载中...</p>
@@ -99,7 +99,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { createAdminUpstream, listAdminUpstreams } from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
 interface UpstreamItem {
@@ -137,10 +138,7 @@ async function loadUpstreams() {
   errorMessage.value = ''
 
   try {
-    const { data } = await apiRequest<UpstreamItem[]>('/admin/upstreams', {
-      accessToken: auth.accessToken
-    })
-    items.value = data
+    items.value = await listAdminUpstreams<UpstreamItem[]>(auth.accessToken)
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
   } finally {
@@ -153,21 +151,17 @@ async function createUpstream() {
   errorMessage.value = ''
 
   try {
-    await apiRequest('/admin/upstreams', {
-      method: 'POST',
-      accessToken: auth.accessToken,
-      body: {
-        name: form.name,
-        provider_type: form.providerType,
-        base_url: form.baseURL,
-        auth_type: form.authType,
-        auth_config: form.apiKey ? { api_key: form.apiKey } : {},
-        status: form.status,
-        timeout_seconds: form.timeoutSeconds,
-        cooldown_seconds: form.cooldownSeconds,
-        failure_threshold: form.failureThreshold,
-        metadata: {}
-      }
+    await createAdminUpstream(auth.accessToken, {
+      name: form.name,
+      provider_type: form.providerType,
+      base_url: form.baseURL,
+      auth_type: form.authType,
+      auth_config: form.apiKey ? { api_key: form.apiKey } : {},
+      status: form.status,
+      timeout_seconds: form.timeoutSeconds,
+      cooldown_seconds: form.cooldownSeconds,
+      failure_threshold: form.failureThreshold,
+      metadata: {}
     })
 
     form.name = ''
@@ -192,7 +186,7 @@ function toErrorMessage(error: unknown) {
 
 <style scoped>
 .admin-page {
-  padding: 2rem;
+  padding: 1rem;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -240,15 +234,22 @@ function toErrorMessage(error: unknown) {
   background: var(--input-bg);
   border: 1px solid var(--input-border);
   border-radius: 12px;
-  padding: 1.5rem;
+  padding: 1rem;
   margin-bottom: 2rem;
 }
 
-.form-card h2, .table-header h2 {
+.form-card h2 {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 1.5rem;
+}
+
+.table-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .admin-form {
@@ -290,7 +291,7 @@ function toErrorMessage(error: unknown) {
 }
 
 .submit-btn {
-  padding: 0.875rem;
+  padding: 0.35rem;
   background: var(--accent-primary);
   color: white;
   border: none;
@@ -314,7 +315,7 @@ function toErrorMessage(error: unknown) {
 .table-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: right;
   margin-bottom: 1.5rem;
 }
 

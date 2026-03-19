@@ -1,8 +1,26 @@
-import axios, { type Method } from 'axios'
+import axios, { type Method, type InternalAxiosRequestConfig } from 'axios'
 
 import { reportPerfMetric } from '@/lib/performance'
 
-export const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8080').replace(/\/$/, '')
+let isRefreshing = false
+let failedQueue: Array<{
+  resolve: (token: string) => void
+  reject: (error: unknown) => void
+}> = []
+
+function processQueue(error: unknown, token: string | null = null) {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token!)
+    }
+  })
+  failedQueue = []
+}
+
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? ''
+export const apiBaseUrl = configuredApiBaseUrl.replace(/\/$/, '')
 
 interface ApiEnvelope<T> {
   success: boolean
@@ -38,7 +56,7 @@ export class ApiError extends Error {
 
 export const apiClient = axios.create({
   baseURL: `${apiBaseUrl}/api/v1`,
-  timeout: 15000,
+  timeout: 150000,
   withCredentials: true,
   headers: {
     Accept: 'application/json'
@@ -47,7 +65,52 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: unknown) => Promise.reject(normalizeAxiosError(error))
+  async (error: unknown) => {
+    const originalRequest = axios.isAxiosError(error) ? error.config : null
+
+    if (axios.isAxiosError(error) && error.response?.status === 401 && originalRequest) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`
+            return apiClient.request(originalRequest)
+          })
+          .catch((err) => Promise.reject(err))
+      }
+
+      isRefreshing = true
+
+      try {
+        const { useAuthStore } = await import('@/stores/auth')
+        const auth = useAuthStore()
+        const success = await auth.refreshSession()
+
+        if (success) {
+          processQueue(null, auth.accessToken)
+          originalRequest.headers.Authorization = `Bearer ${auth.accessToken}`
+          return apiClient.request(originalRequest)
+        } else {
+          processQueue(new Error('Token refresh failed'), null)
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login'
+          }
+          return Promise.reject(normalizeAxiosError(error))
+        }
+      } catch (refreshError) {
+        processQueue(refreshError, null)
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+        return Promise.reject(normalizeAxiosError(error))
+      } finally {
+        isRefreshing = false
+      }
+    }
+
+    return Promise.reject(normalizeAxiosError(error))
+  }
 )
 
 export async function apiRequest<T = unknown>(path: string, options: ApiRequestOptions = {}) {

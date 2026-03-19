@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { apiRequest } from '@/lib/api'
+import { refreshToken, signOut as signOutRequest } from '@/api/auth'
 
 const accessTokenKey = 'mrchat.access_token'
 const userKey = 'mrchat.user'
@@ -25,12 +26,6 @@ export interface CurrentUser extends AuthUser {
   used_quota: number
   created_at: string
   updated_at: string
-}
-
-interface AuthSessionResponse {
-  access_token: string
-  expires_in: number
-  user: AuthUser
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -57,9 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function refreshSession() {
     try {
-      const { data } = await apiRequest<AuthSessionResponse>('/auth/refresh', {
-        method: 'POST'
-      })
+      const data = await refreshToken()
       setSession(data.access_token, data.user)
       return true
     } catch {
@@ -88,9 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function signOut() {
     try {
-      await apiRequest('/auth/signout', {
-        method: 'POST'
-      })
+      await signOutRequest()
     } finally {
       clearSession()
     }

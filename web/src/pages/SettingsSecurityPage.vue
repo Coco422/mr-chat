@@ -38,14 +38,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { getSecurityInfo, type SecurityInfoResponse, updateMyPassword } from '@/api/user'
 import { useAuthStore } from '@/stores/auth'
-
-interface SecurityInfoResponse {
-  last_login_at: string | null
-  password_updated_at: string | null
-  has_password: boolean
-}
 
 const auth = useAuthStore()
 const securityInfo = ref<SecurityInfoResponse | null>(null)
@@ -64,10 +59,7 @@ async function loadSecurityInfo() {
   }
 
   try {
-    const { data } = await apiRequest<SecurityInfoResponse>('/users/me/security', {
-      accessToken: auth.accessToken
-    })
-    securityInfo.value = data
+    securityInfo.value = await getSecurityInfo(auth.accessToken)
   } catch (error) {
     message.value = error instanceof ApiError ? error.message : '加载安全信息失败'
   }
@@ -82,14 +74,7 @@ async function updatePassword() {
   message.value = ''
 
   try {
-    await apiRequest('/users/me/password', {
-      method: 'PUT',
-      accessToken: auth.accessToken,
-      body: {
-        current_password: currentPassword.value,
-        new_password: newPassword.value
-      }
-    })
+    await updateMyPassword(auth.accessToken, currentPassword.value, newPassword.value)
 
     currentPassword.value = ''
     newPassword.value = ''

@@ -72,14 +72,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { ApiError, apiRequest } from '@/lib/api'
+import { ApiError } from '@/lib/api'
+import { getBillingLogs, getMyQuota, type BillingLogItem, type QuotaResponse } from '@/api/user'
 import { useAuthStore } from '@/stores/auth'
-
-interface QuotaResponse {
-  quota: number
-  used_quota: number
-  remaining_quota: number
-}
 
 interface UsageResponse {
   summary: {
@@ -99,14 +94,6 @@ interface BillingSummaryResponse {
   redeemed_total: number
 }
 
-interface BillingLogItem {
-  id: string
-  type: string
-  delta_quota: number
-  balance_after: number
-  reason?: string
-  created_at: string
-}
 
 const auth = useAuthStore()
 const errorMessage = ref('')
@@ -136,15 +123,11 @@ async function loadData() {
 
   try {
     const [quotaResult, logsResult] = await Promise.all([
-      apiRequest<QuotaResponse>('/users/me/quota', {
-        accessToken: auth.accessToken
-      }),
-      apiRequest<BillingLogItem[]>('/billing/logs?page=1&page_size=20', {
-        accessToken: auth.accessToken
-      })
+      getMyQuota(auth.accessToken),
+      getBillingLogs(auth.accessToken, 1, 20)
     ])
 
-    quota.value = quotaResult.data
+    quota.value = quotaResult
     billingLogs.value = logsResult.data
     logsMeta.value = logsResult.meta ?? null
   } catch (error) {
