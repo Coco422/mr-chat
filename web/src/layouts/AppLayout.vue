@@ -2,7 +2,21 @@
   <div class="app-layout">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1 class="logo">MrChat</h1>
+        <div class="header-top">
+          <h1 class="logo">MrChat</h1>
+          <button class="icon-btn theme-btn" @click="toggleTheme" title="切换主题">
+            <svg v-if="isDark()" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="5" stroke-width="2"/><line x1="12" y1="1" x2="12" y2="3" stroke-width="2"/>
+              <line x1="12" y1="21" x2="12" y2="23" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-width="2"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke-width="2"/>
+              <line x1="21" y1="12" x2="23" y2="12" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-width="2"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-width="2"/>
+            </svg>
+            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-width="2"/>
+            </svg>
+          </button>
+        </div>
         <button class="new-chat-btn" @click="createConversation">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -20,7 +34,7 @@
           :class="{ active: currentConversationId === conv.id }"
         >
           <div class="conv-title">{{ conv.title || '新对话' }}</div>
-          <div class="conv-meta">{{ conv.message_count }} 条消息</div>
+          <!-- <div class="conv-meta">{{ conv.message_count }} 条消息</div> -->
         </RouterLink>
         <div v-if="conversations.length === 0" class="empty-state">暂无对话</div>
       </div>
@@ -55,32 +69,20 @@
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-info" v-if="auth.user">
-          <div class="user-avatar">{{ auth.user.username[0].toUpperCase() }}</div>
-          <div class="user-details">
-            <div class="user-name">{{ auth.user.username }}</div>
-            <div class="user-role">{{ auth.user.role }}</div>
+        <div class="footer-row" v-if="auth.user">
+          <div class="user-info">
+            <div class="user-avatar">{{ auth.user.username[0].toUpperCase() }}</div>
+            <div class="user-details">
+              <div class="user-name">{{ auth.user.username }}</div>
+              <div class="user-role">{{ auth.user.role }}</div>
+            </div>
           </div>
-        </div>
-        <div class="footer-actions">
-          <button class="icon-btn" @click="toggleTheme" title="切换主题">
-            <svg v-if="isDark()" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <circle cx="12" cy="12" r="5" stroke-width="2"/><line x1="12" y1="1" x2="12" y2="3" stroke-width="2"/>
-              <line x1="12" y1="21" x2="12" y2="23" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-width="2"/>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke-width="2"/>
-              <line x1="21" y1="12" x2="23" y2="12" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-width="2"/>
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-width="2"/>
-            </svg>
-            <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-width="2"/>
-            </svg>
-          </button>
           <button class="logout-btn" @click="handleSignOut" title="退出登录">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke-width="2"/>
               <line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/>
             </svg>
-            <span>退出登录</span>
+            <span>退出</span>
           </button>
         </div>
       </div>
@@ -168,11 +170,23 @@ async function handleSignOut() {
   border-bottom: 1px solid var(--glass-border);
 }
 
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.9rem;
+}
+
 .logo {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 0.9rem;
+  margin: 0;
+}
+
+.theme-btn {
+  width: 32px;
+  height: 32px;
 }
 
 .new-chat-btn {
@@ -207,8 +221,8 @@ async function handleSignOut() {
 
 .conversation-item {
   display: block;
-  padding: 0.85rem 0.9rem;
-  border-radius: 12px;
+  padding: 0.4rem 0.4rem;
+  border-radius: 6px;
   text-decoration: none;
   color: var(--text-secondary);
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
@@ -223,10 +237,8 @@ async function handleSignOut() {
 }
 
 .conversation-item.active {
-  background: var(--surface-muted);
+  background: color-mix(in srgb, var(--accent-primary) 15%, var(--surface-muted));
   color: var(--text-primary);
-  border-color: var(--glass-border);
-  box-shadow: inset 3px 0 0 var(--accent-primary);
 }
 
 .conv-title {
@@ -251,7 +263,7 @@ async function handleSignOut() {
 }
 
 .nav-menu {
-  padding: 0.5rem 0.75rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border-top: 1px solid var(--glass-border);
 }
 
@@ -259,7 +271,7 @@ async function handleSignOut() {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.8rem 0.9rem;
+  padding: 0.6rem 0.6rem;
   margin-bottom: 0.25rem;
   border-radius: 12px;
   text-decoration: none;
@@ -281,16 +293,21 @@ async function handleSignOut() {
 .sidebar-footer {
   padding: 1rem;
   border-top: 1px solid var(--glass-border);
+}
+
+.footer-row {
   display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .user-info {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  width: 100%;
+  min-width: 0;
+  flex: 1;
 }
 
 .user-avatar {
@@ -345,27 +362,26 @@ async function handleSignOut() {
   color: var(--text-primary);
 }
 
-.footer-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.55rem;
-  width: 100%;
-}
-
 .logout-btn {
-  height: 36px;
-  padding: 0 0.85rem;
-  border-radius: 10px;
+  height: 32px;
+  padding: 0 0.65rem;
+  border-radius: 8px;
   border: 1px solid var(--glass-border);
   background: var(--layout-sidebar-bg);
   color: var(--text-secondary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
   transition: background 0.2s ease, color 0.2s ease;
   white-space: nowrap;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.logout-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .logout-btn:hover {

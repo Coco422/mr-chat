@@ -1,35 +1,34 @@
 <template>
   <section class="chat-page">
-    <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
+    <header class="page-toolbar">
+      <div class="model-panel">
+        <el-select
+          v-model="selectedModelID"
+          class="model-select"
+          :style="modelSelectStyle"
+          popper-class="chat-model-popper"
+          placeholder="请选择模型"
+          size="large"
+        >
+          <el-option
+            v-for="model in models"
+            :key="model.id"
+            :label="model.display_name"
+            :value="model.id"
+          >
+            <div class="model-option">
+              <span class="model-option-name">{{ model.display_name }}</span>
+            </div>
+          </el-option>
+        </el-select>
+      </div>
+
+      <div class="toolbar-actions">
+        <button type="button" class="action-btn" @click="reloadAll" :disabled="loading">刷新</button>
+      </div>
+    </header>
 
     <div class="chat-shell">
-      <header class="chat-toolbar">
-        <div class="model-panel">
-          <el-select
-            v-model="selectedModelID"
-            class="model-select"
-            :style="modelSelectStyle"
-            popper-class="chat-model-popper"
-            placeholder="请选择模型"
-            size="large"
-          >
-            <el-option
-              v-for="model in models"
-              :key="model.id"
-              :label="model.display_name"
-              :value="model.id"
-            >
-              <div class="model-option">
-                <span class="model-option-name">{{ model.display_name }}</span>
-              </div>
-            </el-option>
-          </el-select>
-        </div>
-
-        <div class="toolbar-actions">
-          <button type="button" class="action-btn" @click="reloadAll" :disabled="loading">刷新</button>
-        </div>
-      </header>
 
       <div v-if="loadingMessages" class="chat-body chat-body-loading">
         <p class="state-copy">消息加载中...</p>
@@ -247,7 +246,6 @@ const router = useRouter()
 const loading = ref(false)
 const loadingMessages = ref(false)
 const sending = ref(false)
-const errorMessage = ref('')
 const models = ref<UserModel[]>([])
 const conversations = ref<ConversationSummary[]>([])
 const messages = ref<MessageItem[]>([])
@@ -295,7 +293,6 @@ watch(inputMessage, () => {
 
 async function reloadAll() {
   loading.value = true
-  errorMessage.value = ''
 
   try {
     const [modelsResponse, conversationsResponse] = await Promise.all([
@@ -319,7 +316,7 @@ async function reloadAll() {
       messages.value = []
     }
   } catch (error) {
-    errorMessage.value = toErrorMessage(error)
+    ElMessage.error(toErrorMessage(error))
   } finally {
     loading.value = false
   }
@@ -327,14 +324,13 @@ async function reloadAll() {
 
 async function loadMessages(conversationID: string) {
   loadingMessages.value = true
-  errorMessage.value = ''
 
   try {
     messages.value = await listConversationMessages(auth.accessToken, conversationID)
     scrollMessagesToBottom()
   } catch (error) {
     messages.value = []
-    errorMessage.value = toErrorMessage(error)
+    ElMessage.error(toErrorMessage(error))
   } finally {
     loadingMessages.value = false
   }
@@ -371,12 +367,11 @@ async function runCompletion(options: {
     return
   }
   if (!selectedModelID.value) {
-    errorMessage.value = '请先选择模型'
+    ElMessage.warning('请先选择模型')
     return
   }
 
   sending.value = true
-  errorMessage.value = ''
   cancelEditing()
 
   const controller = new AbortController()
@@ -451,7 +446,7 @@ async function runCompletion(options: {
             patchMessage(assistantMessageID, {
               status: 'failed'
             })
-            errorMessage.value = `${event.error?.code ?? 'CHAT_STREAM_FAILED'}: ${event.error?.message ?? 'Streaming failed'}`
+            ElMessage.error(`${event.error?.code ?? 'CHAT_STREAM_FAILED'}: ${event.error?.message ?? 'Streaming failed'}`)
             break
         }
       }
@@ -465,10 +460,10 @@ async function runCompletion(options: {
   } catch (error) {
     if (isAbortError(error)) {
       patchMessage(assistantMessageID, { status: 'cancelled' })
-      errorMessage.value = '已停止生成'
+      ElMessage.warning('已停止生成')
     } else {
       patchMessage(assistantMessageID, { status: 'failed' })
-      errorMessage.value = toErrorMessage(error)
+      ElMessage.error(toErrorMessage(error))
     }
 
     if (nextConversationID && nextConversationID !== currentConversationId.value) {
@@ -599,7 +594,7 @@ function formatMessageTime(value: string) {
 
 function roleLabel(role: string) {
   if (role === 'user') {
-    return '你'
+    return ''
   }
   if (role === 'assistant') {
     return 'AI'
@@ -744,19 +739,23 @@ function deleteMessage(messageID: string) {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  align-items: center;
   padding: 1rem;
   background: var(--layout-content-bg);
   color: var(--text-primary);
 }
 
-.error-banner {
-  margin: 0;
-  padding: 0.7rem 0.85rem;
-  border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--error-color) 45%, transparent);
-  background: color-mix(in srgb, var(--error-color) 10%, transparent);
-  color: var(--error-color);
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0 0.5rem;
+}
+
+.model-panel {
+  min-width: 0;
+  flex: none;
 }
 
 .chat-shell {
@@ -766,18 +765,7 @@ function deleteMessage(messageID: string) {
   flex-direction: column;
   gap: 1.25rem;
   width: min(100%, 960px);
-}
-
-.chat-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.model-panel {
-  min-width: 0;
-  flex: none;
+  align-self: center;
 }
 
 .toolbar-actions {
@@ -857,6 +845,7 @@ function deleteMessage(messageID: string) {
 
 .message-row {
   display: flex;
+  width: 100%;
 }
 
 .message-row.role-user {
@@ -873,22 +862,22 @@ function deleteMessage(messageID: string) {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
-  padding: 1rem 1.05rem 0.85rem;
-  border: 1px solid var(--input-border);
-  border-radius: 18px;
-  background: var(--bg-secondary);
+  gap: 0.65rem;
+  padding: 0.5rem;
 }
 
 .message-row.role-user .message-bubble {
   max-width: min(72%, 34rem);
-  border-bottom-right-radius: 6px;
-  background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-secondary));
-  border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--input-border));
+  margin-left: auto;
+  align-items: flex-end;
 }
 
-.message-row.role-assistant .message-bubble {
-  border-bottom-left-radius: 6px;
+.message-row.role-user .user-content {
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  background: color-mix(in srgb, var(--accent-primary) 25%, var(--bg-secondary));
+  width: fit-content;
+  margin-left: auto;
 }
 
 .message-meta {
@@ -898,6 +887,12 @@ function deleteMessage(messageID: string) {
   gap: 0.9rem;
   color: var(--text-secondary);
   font-size: 0.78rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-bubble:hover .message-meta {
+  opacity: 1;
 }
 
 .message-role {
@@ -962,6 +957,12 @@ function deleteMessage(messageID: string) {
   align-items: center;
   gap: 0.45rem;
   padding-top: 0.2rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-bubble:hover .message-tools {
+  opacity: 1;
 }
 
 .tool-btn {
