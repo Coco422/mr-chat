@@ -290,26 +290,8 @@ let groupsRequest: Promise<void> | null = null
 let modelsRequest: Promise<void> | null = null
 
 onMounted(async () => {
-  await reloadAll()
+  await loadUsers()
 })
-
-async function reloadAll() {
-  await Promise.all([loadUsers(), loadReferenceData()])
-}
-
-async function loadReferenceData() {
-  try {
-    const [groupResponse, modelResponse] = await Promise.all([
-      listAdminUserGroups<UserGroupItem[]>(auth.accessToken),
-      listAdminModels<ModelItem[]>(auth.accessToken)
-    ])
-
-    groups.value = groupResponse
-    models.value = modelResponse
-  } catch (error) {
-    errorMessage.value = toErrorMessage(error)
-  }
-}
 
 async function loadUsers() {
   loading.value = true
@@ -344,6 +326,68 @@ async function loadUsers() {
   } finally {
     loading.value = false
   }
+}
+
+async function handleGroupsVisibleChange(visible: boolean) {
+  if (!visible) {
+    return
+  }
+  await ensureGroupsLoaded()
+}
+
+async function handleModelsVisibleChange(visible: boolean) {
+  if (!visible) {
+    return
+  }
+  await ensureModelsLoaded()
+}
+
+async function ensureGroupsLoaded() {
+  if (groups.value.length > 0) {
+    return
+  }
+  if (groupsRequest) {
+    return groupsRequest
+  }
+
+  groupsLoading.value = true
+  groupsRequest = (async () => {
+    try {
+      groups.value = await listAdminUserGroups<UserGroupItem[]>(auth.accessToken)
+    } catch (error) {
+      errorMessage.value = toErrorMessage(error)
+      throw error
+    } finally {
+      groupsLoading.value = false
+      groupsRequest = null
+    }
+  })()
+
+  return groupsRequest
+}
+
+async function ensureModelsLoaded() {
+  if (models.value.length > 0) {
+    return
+  }
+  if (modelsRequest) {
+    return modelsRequest
+  }
+
+  modelsLoading.value = true
+  modelsRequest = (async () => {
+    try {
+      models.value = await listAdminModels<ModelItem[]>(auth.accessToken)
+    } catch (error) {
+      errorMessage.value = toErrorMessage(error)
+      throw error
+    } finally {
+      modelsLoading.value = false
+      modelsRequest = null
+    }
+  })()
+
+  return modelsRequest
 }
 
 async function assignUserGroup(userID: string) {
