@@ -94,13 +94,6 @@
                         <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"></path>
                       </svg>
                     </button>
-                    <button type="button" class="tool-btn" title="删除" @click="deleteMessage(message.id)">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M3 6h18"></path>
-                        <path d="M8 6V4h8v2"></path>
-                        <path d="M19 6l-1 14H6L5 6"></path>
-                      </svg>
-                    </button>
                     <button type="button" class="tool-btn" title="重新生成" :disabled="sending" @click="regenerateFromAssistant(index)">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
                         <path d="M3 12a9 9 0 0 1 15.3-6.36L21 8"></path>
@@ -144,13 +137,6 @@
                         <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>
                       </svg>
                     </button>
-                    <button type="button" class="tool-btn" title="删除" @click="deleteMessage(message.id)">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <path d="M3 6h18"></path>
-                        <path d="M8 6V4h8v2"></path>
-                        <path d="M19 6l-1 14H6L5 6"></path>
-                      </svg>
-                    </button>
                   </template>
                 </div>
               </article>
@@ -160,7 +146,10 @@
 
         <div v-else class="empty-state">
           <h1>开始新的对话</h1>
-          <p>选择模型后，在这里直接输入你的问题。</p>
+          <p class="empty-state-typewriter">
+            <span>{{ emptyStateTypewriterText }}</span>
+            <span class="typewriter-caret" aria-hidden="true"></span>
+          </p>
         </div>
 
         <form
@@ -213,7 +202,7 @@
 import DOMPurify from 'dompurify'
 import { ElMessage } from 'element-plus'
 import MarkdownIt from 'markdown-it'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { ApiError } from '@/lib/api'
@@ -259,6 +248,17 @@ const isComposing = ref(false)
 const isEditingComposing = ref(false)
 const editingMessageID = ref('')
 const editingMessageDraft = ref('')
+const emptyStateTypewriterText = ref('')
+const typewriterTimer = ref<number | null>(null)
+const typewriterPromptIndex = ref(0)
+const typewriterCharIndex = ref(0)
+const typewriterDeleting = ref(false)
+
+const emptyStatePrompts = [
+  '选择模型后，在这里直接输入你的问题。',
+  '试试让它帮你整理方案、写代码或者润色文案。',
+  '也可以直接丢一个需求，让它一步步往下做。'
+]
 
 const currentConversationId = computed(() =>
   typeof route.params.conversationId === 'string' ? route.params.conversationId : ''
@@ -279,6 +279,10 @@ onMounted(async () => {
   resizeComposerInput()
 })
 
+onBeforeUnmount(() => {
+  stopEmptyStateTypewriter()
+})
+
 watch(currentConversationId, async () => {
   cancelEditing()
   if (sending.value) {
@@ -290,6 +294,18 @@ watch(currentConversationId, async () => {
 watch(inputMessage, () => {
   resizeComposerInput()
 })
+
+watch(
+  [hasMessages, loadingMessages],
+  ([nextHasMessages, nextLoadingMessages]) => {
+    if (nextHasMessages || nextLoadingMessages) {
+      stopEmptyStateTypewriter()
+      return
+    }
+    startEmptyStateTypewriter()
+  },
+  { immediate: true }
+)
 
 async function reloadAll() {
   loading.value = true
@@ -723,13 +739,71 @@ function toRequestMessages(items: MessageItem[]): RequestMessage[] {
     }))
 }
 
-function deleteMessage(messageID: string) {
-  messages.value = messages.value.filter((item) => item.id !== messageID)
-  if (editingMessageID.value === messageID) {
-    cancelEditing()
+function startEmptyStateTypewriter() {
+  if (typewriterTimer.value !== null) {
+    return
   }
-  ElMessage.warning('已从当前页面移除，后端暂未提供单条消息删除接口')
+  scheduleEmptyStateTypewriterTick(180)
 }
+
+function stopEmptyStateTypewriter() {
+  if (typewriterTimer.value !== null) {
+    window.clearTimeout(typewriterTimer.value)
+    typewriterTimer.value = null
+  }
+  emptyStateTypewriterText.value = ''
+  typewriterPromptIndex.value = 0
+  typewriterCharIndex.value = 0
+  typewriterDeleting.value = false
+}
+
+function scheduleEmptyStateTypewriterTick(delay: number) {
+  if (typewriterTimer.value !== null) {
+    window.clearTimeout(typewriterTimer.value)
+  }
+  typewriterTimer.value = window.setTimeout(runEmptyStateTypewriterTick, delay)
+}
+
+function runEmptyStateTypewriterTick() {
+  typewriterTimer.value = null
+
+  if (hasMessages.value || loadingMessages.value) {
+    stopEmptyStateTypewriter()
+    return
+  }
+
+  const prompt = emptyStatePrompts[typewriterPromptIndex.value] ?? ''
+  if (!prompt) {
+    return
+  }
+
+  if (!typewriterDeleting.value) {
+    typewriterCharIndex.value += 1
+    emptyStateTypewriterText.value = prompt.slice(0, typewriterCharIndex.value)
+
+    if (typewriterCharIndex.value >= prompt.length) {
+      typewriterDeleting.value = true
+      scheduleEmptyStateTypewriterTick(1800)
+      return
+    }
+
+    scheduleEmptyStateTypewriterTick(70)
+    return
+  }
+
+  typewriterCharIndex.value = Math.max(typewriterCharIndex.value - 1, 0)
+  emptyStateTypewriterText.value = prompt.slice(0, typewriterCharIndex.value)
+
+  if (typewriterCharIndex.value === 0) {
+    typewriterDeleting.value = false
+    typewriterPromptIndex.value = (typewriterPromptIndex.value + 1) % emptyStatePrompts.length
+    scheduleEmptyStateTypewriterTick(260)
+    return
+  }
+
+  scheduleEmptyStateTypewriterTick(32)
+}
+
 </script>
 
 <style scoped>
@@ -1014,6 +1088,33 @@ function deleteMessage(messageID: string) {
 .empty-state p {
   margin: 0;
   color: var(--text-secondary);
+}
+
+.empty-state-typewriter {
+  min-height: 1.7em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+}
+
+.typewriter-caret {
+  width: 1px;
+  height: 1.05em;
+  background: currentColor;
+  animation: caret-blink 0.9s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
 }
 
 .composer-form {
