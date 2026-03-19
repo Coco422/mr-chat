@@ -23,9 +23,9 @@
         </el-select>
       </div>
 
-      <div class="toolbar-actions">
+      <!-- <div class="toolbar-actions">
         <button type="button" class="action-btn" @click="reloadAll" :disabled="loading">刷新</button>
-      </div>
+      </div> -->
     </header>
 
     <div class="chat-shell">
