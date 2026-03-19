@@ -165,7 +165,10 @@ router.beforeEach(async (to) => {
     }
 
     if (!auth.user) {
-      await auth.fetchMe().catch(() => null)
+      const currentUser = await auth.fetchMe().catch(() => null)
+      if (!currentUser) {
+        return { name: 'login' }
+      }
     }
   }
 
