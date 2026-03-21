@@ -654,6 +654,30 @@ paths:
       summary: Import discovered models
       tags:
       - Admin
+  /admin/references:
+    get:
+      description: Return common lightweight option lists for admin forms, including
+        upstreams, channels, user groups and models.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get admin references
+      tags:
+      - Admin
   /admin/upstreams:
     get:
       produces:

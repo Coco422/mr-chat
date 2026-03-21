@@ -142,6 +142,13 @@ type ImportModelsResult struct {
 	Summary  map[string]any
 }
 
+type ReferencesResult struct {
+	Upstreams  []catalog.Upstream
+	Channels   []catalog.Channel
+	UserGroups []account.UserGroup
+	Models     []catalog.ModelWithBindings
+}
+
 func NewService(accountRepo *account.Repository, catalogRepo *catalog.Repository, limitsService *limits.Service, auditRepo *audit.Repository) *Service {
 	return &Service{
 		accountRepo:   accountRepo,
@@ -154,6 +161,35 @@ func NewService(accountRepo *account.Repository, catalogRepo *catalog.Repository
 
 func (s *Service) ListUpstreams(ctx context.Context) ([]catalog.Upstream, error) {
 	return s.catalogRepo.ListUpstreams(ctx)
+}
+
+func (s *Service) GetReferences(ctx context.Context) (*ReferencesResult, error) {
+	upstreams, err := s.catalogRepo.ListUpstreams(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	channels, err := s.catalogRepo.ListChannels(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userGroups, err := s.accountRepo.ListUserGroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	models, err := s.catalogRepo.ListModels(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ReferencesResult{
+		Upstreams:  upstreams,
+		Channels:   channels,
+		UserGroups: userGroups,
+		Models:     models,
+	}, nil
 }
 
 func (s *Service) GetUpstream(ctx context.Context, upstreamID string) (*catalog.Upstream, error) {

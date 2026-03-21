@@ -121,6 +121,26 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
+// GetReferences godoc
+// @Summary Get admin references
+// @Description Return common lightweight option lists for admin forms, including upstreams, channels, user groups and models.
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Router /admin/references [get]
+func (h *Handler) GetReferences(c *gin.Context) {
+	result, err := h.service.GetReferences(c.Request.Context())
+	if err != nil {
+		h.internalError(c)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toReferences(result))
+}
+
 // ListUpstreams godoc
 // @Summary List upstreams
 // @Tags Admin
@@ -1235,6 +1255,59 @@ func toImportModelsResult(result *ImportModelsResult) gin.H {
 		"upstream": toUpstream(result.Upstream),
 		"items":    items,
 		"summary":  result.Summary,
+	}
+}
+
+func toReferences(result *ReferencesResult) gin.H {
+	if result == nil {
+		return gin.H{}
+	}
+
+	upstreams := make([]gin.H, 0, len(result.Upstreams))
+	for _, item := range result.Upstreams {
+		upstreams = append(upstreams, gin.H{
+			"id":            item.ID,
+			"name":          item.Name,
+			"provider_type": item.ProviderType,
+			"status":        item.Status,
+		})
+	}
+
+	channels := make([]gin.H, 0, len(result.Channels))
+	for _, item := range result.Channels {
+		channels = append(channels, gin.H{
+			"id":          item.ID,
+			"name":        item.Name,
+			"description": item.Description,
+			"status":      item.Status,
+		})
+	}
+
+	userGroups := make([]gin.H, 0, len(result.UserGroups))
+	for _, item := range result.UserGroups {
+		userGroups = append(userGroups, gin.H{
+			"id":          item.ID,
+			"name":        item.Name,
+			"description": item.Description,
+			"status":      item.Status,
+		})
+	}
+
+	models := make([]gin.H, 0, len(result.Models))
+	for _, item := range result.Models {
+		models = append(models, gin.H{
+			"id":           item.Model.ID,
+			"model_key":    item.Model.ModelKey,
+			"display_name": item.Model.DisplayName,
+			"status":       item.Model.Status,
+		})
+	}
+
+	return gin.H{
+		"upstreams":   upstreams,
+		"channels":    channels,
+		"user_groups": userGroups,
+		"models":      models,
 	}
 }
 

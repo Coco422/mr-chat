@@ -743,6 +743,18 @@ data: [DONE]
 - `delta` 可正可负
 - 必须写入 `quota_logs` 与 `audit_logs`
 
+## 11.2A `GET /api/v1/admin/references`
+
+- 返回管理台表单常用的轻量引用数据，减少多个页面重复拉：
+  - `upstreams`
+  - `channels`
+  - `user_groups`
+  - `models`
+- 适合用在：
+  - 模型导入页
+  - 模型创建/编辑页
+  - 用户管理页的分组和模型下拉
+
 ## 11.3 `GET /api/v1/admin/upstreams`
 
 - 返回上游列表

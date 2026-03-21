@@ -43,6 +43,7 @@
 - Admin 上游 / 渠道 / 模型 / 用户组详情联调
 - Admin 上游模型发现与模型导入联调
 - Admin 模型 human-readable 返回联调
+- Admin `references` 轻量选项接口联调
 - Chat 非流式主链路联调：`/api/v1/chat/completions -> upstream -> messages -> llm_request_logs`
 - Chat 流式主链路联调：`/api/v1/chat/completions(stream=true) -> SSE -> messages -> llm_request_logs`
 - Chat 侧模型列表、会话 CRUD、消息列表联调

@@ -86,6 +86,8 @@ func New(
 			middleware.RequireRoles(account.RoleAdmin, account.RoleRoot),
 		)
 		{
+			adminGroup.GET("/references", adminHandler.GetReferences)
+
 			adminGroup.GET("/upstreams", adminHandler.ListUpstreams)
 			adminGroup.GET("/upstreams/:id", adminHandler.GetUpstream)
 			adminGroup.GET("/upstreams/:id/discovered-models", adminHandler.DiscoverUpstreamModels)

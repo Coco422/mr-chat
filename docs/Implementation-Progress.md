@@ -14,6 +14,7 @@
 - 核心表结构已经落到 PostgreSQL，并支持服务启动自动迁移
 - 管理侧已具备上游、渠道、模型、用户组、用户调额、用户限额调整、审计日志的首版 API
 - 管理侧已补齐上游/渠道/模型/用户组详情接口，并进入“模型发现 + 导入 + human-readable 返回”的过渡阶段
+- 管理侧已补 `GET /api/v1/admin/references`，可为前端统一提供轻量选项字典
 - Chat 侧已具备模型列表、会话 CRUD、消息分页查询、非流式与 SSE `/chat/completions`、用户限额前置校验、消息持久化和 `llm_request_logs` 落库
 - Swagger UI 已接入，可直接通过 `/swagger/index.html` 查看当前接口
 - 前端已提供无样式联调壳子，可直接对接登录、设置、用量、Chat 和主要 Admin 页面
@@ -61,6 +62,7 @@
   - `GET /swagger/index.html`
   - `GET /swagger/doc.json`
 - Admin
+  - `GET /api/v1/admin/references`
   - `GET /api/v1/admin/upstreams`
   - `GET /api/v1/admin/upstreams/:id`
   - `GET /api/v1/admin/upstreams/:id/discovered-models`
@@ -142,6 +144,7 @@
 - 管理员通过 `POST /api/v1/admin/models/import` 已能对已存在模型返回 `skipped_existing`，避免重复创建
 - 管理员通过 `GET /api/v1/admin/models/:id` 已能拿到 `visible_user_groups`、`visibility_summary` 和 hydrated `route_bindings`
 - 管理员通过 `GET /api/v1/admin/channels/:id` 与 `GET /api/v1/admin/user-groups/:id` 已能读取单资源详情
+- 管理台前端已可通过 `GET /api/v1/admin/references` 一次性获取 upstream/channel/user_group/model 下拉选项
 - 上游读接口当前会对 `auth_config` 中的敏感字段做脱敏，不再直接回传明文 `api_key`
 - 会话、消息、usage 和 `llm_request_logs` 已成功落库，`limit_usage` 已体现请求次数与 token 消耗增量
 - Chat 最小联调页已切到 `fetch + SSE`，并支持最基本的“停止生成”
