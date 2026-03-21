@@ -1,5 +1,12 @@
 import { apiRequest } from '@/lib/api'
 
+export async function getAdminReferences<T>(accessToken: string) {
+  const { data } = await apiRequest<T>('/admin/references', {
+    accessToken
+  })
+  return data
+}
+
 export async function listAdminChannels<T>(accessToken: string) {
   const { data } = await apiRequest<T>('/admin/channels', {
     accessToken

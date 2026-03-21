@@ -39,8 +39,23 @@
         </div>
 
         <div class="form-group">
-          <label>Visible User Group IDs</label>
-          <input v-model.trim="form.visibleUserGroupIDsRaw" type="text" placeholder="uuid1,uuid2" />
+          <label>Visible User Groups</label>
+          <el-select
+            v-model="form.visibleUserGroupIDs"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            style="width: 100%"
+            :loading="referencesLoading"
+            placeholder="留空表示 all users"
+          >
+            <el-option
+              v-for="group in userGroups"
+              :key="group.id"
+              :value="group.id"
+              :label="group.name"
+            />
+          </el-select>
         </div>
 
         <div class="form-row">
@@ -49,8 +64,7 @@
             <el-select
               v-model="form.channelID"
               style="width: 100%"
-              :loading="channelsLoading"
-              @visible-change="handleChannelsVisibleChange"
+              :loading="referencesLoading"
             >
               <el-option value="" label="默认路由" />
               <el-option v-for="channel in channels" :key="channel.id" :value="channel.id" :label="channel.name" />
@@ -61,8 +75,7 @@
             <el-select
               v-model="form.upstreamID"
               style="width: 100%"
-              :loading="upstreamsLoading"
-              @visible-change="handleUpstreamsVisibleChange"
+              :loading="referencesLoading"
             >
               <el-option value="" label="请选择" />
               <el-option v-for="upstream in upstreams" :key="upstream.id" :value="upstream.id" :label="upstream.name" />
@@ -104,11 +117,11 @@
             <td class="model-key">{{ item.model_key }}</td>
             <td><span class="status-badge" :class="item.status">{{ item.status }}</span></td>
             <td class="user-groups">
-              {{ item.visible_user_group_ids.length > 0 ? item.visible_user_group_ids.join(', ') : 'all users' }}
+              {{ item.visibility_summary || 'all users' }}
             </td>
             <td>
               <span v-for="binding in item.route_bindings" :key="binding.id" class="binding-tag">
-                {{ binding.channel_id || 'default' }} → {{ binding.upstream_id }}#{{ binding.priority }}
+                {{ binding.summary || formatBinding(binding) }}
               </span>
             </td>
           </tr>
@@ -125,9 +138,8 @@ import { onMounted, reactive, ref } from 'vue'
 import { ApiError } from '@/lib/api'
 import {
   createAdminModel,
-  listAdminChannels,
+  getAdminReferences,
   listAdminModels,
-  listAdminUpstreams
 } from '@/api/admin'
 import { useAuthStore } from '@/stores/auth'
 
@@ -141,18 +153,33 @@ interface ChannelItem {
   name: string
 }
 
+interface UserGroupItem {
+  id: string
+  name: string
+}
+
 interface ModelItem {
   id: string
   model_key: string
   display_name: string
   status: string
+  visibility_summary?: string
   visible_user_group_ids: string[]
   route_bindings: Array<{
     id: string
     channel_id: string | null
     upstream_id: string
     priority: number
+    summary?: string
+    channel?: ChannelItem | null
+    upstream?: UpstreamItem | null
   }>
+}
+
+interface AdminReferences {
+  upstreams: UpstreamItem[]
+  channels: ChannelItem[]
+  user_groups: UserGroupItem[]
 }
 
 const auth = useAuthStore()
@@ -162,25 +189,25 @@ const errorMessage = ref('')
 const showForm = ref(false)
 const upstreams = ref<UpstreamItem[]>([])
 const channels = ref<ChannelItem[]>([])
+const userGroups = ref<UserGroupItem[]>([])
 const items = ref<ModelItem[]>([])
-const upstreamsLoading = ref(false)
-const channelsLoading = ref(false)
+const referencesLoading = ref(false)
+const referencesLoaded = ref(false)
 const form = reactive({
   modelKey: '',
   displayName: '',
   providerType: 'openai_compatible',
   contextLength: 32000,
   maxOutputTokens: 4096,
-  visibleUserGroupIDsRaw: '',
+  visibleUserGroupIDs: [] as string[],
   channelID: '',
   upstreamID: '',
   status: 'active'
 })
-let upstreamsRequest: Promise<void> | null = null
-let channelsRequest: Promise<void> | null = null
+let referencesRequest: Promise<void> | null = null
 
 onMounted(async () => {
-  await loadData()
+  await Promise.all([loadData(), ensureReferencesLoaded()])
 })
 
 async function loadData() {
@@ -196,69 +223,35 @@ async function loadData() {
   }
 }
 
-async function handleChannelsVisibleChange(visible: boolean) {
-  if (!visible) {
+async function ensureReferencesLoaded() {
+  if (referencesLoaded.value) {
     return
   }
-  await ensureChannelsLoaded()
-}
-
-async function handleUpstreamsVisibleChange(visible: boolean) {
-  if (!visible) {
-    return
-  }
-  await ensureUpstreamsLoaded()
-}
-
-async function ensureChannelsLoaded() {
-  if (channels.value.length > 0) {
-    return
-  }
-  if (channelsRequest) {
-    return channelsRequest
+  if (referencesRequest) {
+    return referencesRequest
   }
 
-  channelsLoading.value = true
-  channelsRequest = (async () => {
+  referencesLoading.value = true
+  referencesRequest = (async () => {
     try {
-      channels.value = await listAdminChannels<ChannelItem[]>(auth.accessToken)
-    } catch (error) {
-      errorMessage.value = toErrorMessage(error)
-      throw error
-    } finally {
-      channelsLoading.value = false
-      channelsRequest = null
-    }
-  })()
-
-  return channelsRequest
-}
-
-async function ensureUpstreamsLoaded() {
-  if (upstreams.value.length > 0) {
-    return
-  }
-  if (upstreamsRequest) {
-    return upstreamsRequest
-  }
-
-  upstreamsLoading.value = true
-  upstreamsRequest = (async () => {
-    try {
-      upstreams.value = await listAdminUpstreams<UpstreamItem[]>(auth.accessToken)
+      const data = await getAdminReferences<AdminReferences>(auth.accessToken)
+      upstreams.value = data.upstreams
+      channels.value = data.channels
+      userGroups.value = data.user_groups
       if (!form.upstreamID && upstreams.value.length > 0) {
         form.upstreamID = upstreams.value[0].id
       }
+      referencesLoaded.value = true
     } catch (error) {
       errorMessage.value = toErrorMessage(error)
       throw error
     } finally {
-      upstreamsLoading.value = false
-      upstreamsRequest = null
+      referencesLoading.value = false
+      referencesRequest = null
     }
   })()
 
-  return upstreamsRequest
+  return referencesRequest
 }
 
 async function createModel() {
@@ -276,7 +269,7 @@ async function createModel() {
       capabilities: {
         chat: true
       },
-      visible_user_group_ids: parseCSV(form.visibleUserGroupIDsRaw),
+      visible_user_group_ids: form.visibleUserGroupIDs,
       status: form.status,
       metadata: {},
       route_bindings: form.upstreamID
@@ -293,7 +286,7 @@ async function createModel() {
 
     form.modelKey = ''
     form.displayName = ''
-    form.visibleUserGroupIDsRaw = ''
+    form.visibleUserGroupIDs = []
     await loadData()
   } catch (error) {
     errorMessage.value = toErrorMessage(error)
@@ -302,11 +295,10 @@ async function createModel() {
   }
 }
 
-function parseCSV(value: string) {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+function formatBinding(binding: ModelItem['route_bindings'][number]) {
+  const channelName = binding.channel?.name || 'default route'
+  const upstreamName = binding.upstream?.name || binding.upstream_id
+  return `${channelName} -> ${upstreamName} (priority ${binding.priority})`
 }
 
 function toErrorMessage(error: unknown) {
