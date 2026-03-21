@@ -87,18 +87,24 @@ func New(
 		)
 		{
 			adminGroup.GET("/upstreams", adminHandler.ListUpstreams)
+			adminGroup.GET("/upstreams/:id", adminHandler.GetUpstream)
+			adminGroup.GET("/upstreams/:id/discovered-models", adminHandler.DiscoverUpstreamModels)
 			adminGroup.POST("/upstreams", adminHandler.CreateUpstream)
 			adminGroup.PUT("/upstreams/:id", adminHandler.UpdateUpstream)
 
 			adminGroup.GET("/channels", adminHandler.ListChannels)
+			adminGroup.GET("/channels/:id", adminHandler.GetChannel)
 			adminGroup.POST("/channels", adminHandler.CreateChannel)
 			adminGroup.PUT("/channels/:id", adminHandler.UpdateChannel)
 
 			adminGroup.GET("/models", adminHandler.ListModels)
+			adminGroup.GET("/models/:id", adminHandler.GetModel)
+			adminGroup.POST("/models/import", adminHandler.ImportModels)
 			adminGroup.POST("/models", adminHandler.CreateModel)
 			adminGroup.PUT("/models/:id", adminHandler.UpdateModel)
 
 			adminGroup.GET("/user-groups", adminHandler.ListUserGroups)
+			adminGroup.GET("/user-groups/:id", adminHandler.GetUserGroup)
 			adminGroup.POST("/user-groups", adminHandler.CreateUserGroup)
 			adminGroup.PUT("/user-groups/:id", adminHandler.UpdateUserGroup)
 			adminGroup.GET("/user-groups/:id/limits", adminHandler.GetUserGroupLimitPolicies)

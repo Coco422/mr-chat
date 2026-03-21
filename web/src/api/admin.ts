@@ -7,6 +7,13 @@ export async function listAdminChannels<T>(accessToken: string) {
   return data
 }
 
+export async function getAdminChannel<T>(accessToken: string, channelID: string) {
+  const { data } = await apiRequest<T>(`/admin/channels/${channelID}`, {
+    accessToken
+  })
+  return data
+}
+
 export async function createAdminChannel(accessToken: string, body: Record<string, unknown>) {
   await apiRequest('/admin/channels', {
     method: 'POST',
@@ -18,6 +25,22 @@ export async function createAdminChannel(accessToken: string, body: Record<strin
 export async function listAdminModels<T>(accessToken: string) {
   const { data } = await apiRequest<T>('/admin/models', {
     accessToken
+  })
+  return data
+}
+
+export async function getAdminModel<T>(accessToken: string, modelID: string) {
+  const { data } = await apiRequest<T>(`/admin/models/${modelID}`, {
+    accessToken
+  })
+  return data
+}
+
+export async function importAdminModels<T>(accessToken: string, body: Record<string, unknown>) {
+  const { data } = await apiRequest<T>('/admin/models/import', {
+    method: 'POST',
+    accessToken,
+    body
   })
   return data
 }
@@ -37,6 +60,20 @@ export async function listAdminUpstreams<T>(accessToken: string) {
   return data
 }
 
+export async function getAdminUpstream<T>(accessToken: string, upstreamID: string) {
+  const { data } = await apiRequest<T>(`/admin/upstreams/${upstreamID}`, {
+    accessToken
+  })
+  return data
+}
+
+export async function discoverAdminUpstreamModels<T>(accessToken: string, upstreamID: string) {
+  const { data } = await apiRequest<T>(`/admin/upstreams/${upstreamID}/discovered-models`, {
+    accessToken
+  })
+  return data
+}
+
 export async function createAdminUpstream(accessToken: string, body: Record<string, unknown>) {
   await apiRequest('/admin/upstreams', {
     method: 'POST',
@@ -47,6 +84,13 @@ export async function createAdminUpstream(accessToken: string, body: Record<stri
 
 export async function listAdminUserGroups<T>(accessToken: string) {
   const { data } = await apiRequest<T>('/admin/user-groups', {
+    accessToken
+  })
+  return data
+}
+
+export async function getAdminUserGroup<T>(accessToken: string, groupID: string) {
+  const { data } = await apiRequest<T>(`/admin/user-groups/${groupID}`, {
     accessToken
   })
   return data

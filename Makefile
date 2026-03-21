@@ -1,6 +1,6 @@
 APP_NAME ?= mrchat-api
 GOOSE ?= go run ./cmd/migrate
-POSTGRES_DSN ?= postgres://mrchat:mrchat@127.0.0.1:5432/mrchat?sslmode=disable
+POSTGRES_DSN ?= postgres://mrchat:mrchat@172.16.99.32:5432/mrchat?sslmode=disable
 
 .PHONY: compose-up compose-down api-run web-dev test fmt swagger migrate-status migrate-up migrate-down
 

@@ -1,18 +1,19 @@
 # MrChat v0.1 开发任务拆解清单
 
 - 状态：执行中
-- 日期：2026-03-18
-- 更新摘要：已补 `user_groups` / `channels` / limit policies / user adjustments / `llm_request_logs` 设计与首版实现，并已接通首个基于数据库配置的 OpenAI 兼容上游、Swagger UI 与 `stream=true` SSE 主链路
+- 日期：2026-03-21
+- 更新摘要：已补 `user_groups` / `channels` / limit policies / user adjustments / `llm_request_logs` 设计与首版实现，并已接通首个基于数据库配置的 OpenAI 兼容上游、Swagger UI 与 `stream=true` SSE 主链路；2026-03-21 新增管理控制台重构计划，并落地上游模型发现、模型导入、admin 详情接口与 human-readable 关联返回
 - 依赖文档：
   - `docs/Requirements-Baseline-v0.1.md`
   - `docs/Page-and-Route-Spec-v0.1.md`
   - `docs/API-Contract-v0.1.md`
   - `docs/Data-Model-and-State-v0.1.md`
+  - `docs/Admin-Console-Refactor-Plan-v0.1.md`
   - `docs/Implementation-Progress.md`
 
 ## 0. 当前实现快照
 
-截至 `2026-03-18`，当前任务推进情况可简化理解为：
+截至 `2026-03-21`，当前任务推进情况可简化理解为：
 
 - 已落地：
   - `INF-01`、`INF-02`、`INF-03`、`INF-04`、`INF-06`、`INF-07`
@@ -20,7 +21,7 @@
   - `AUTH-BE-01`、`AUTH-BE-02`
   - `USER-BE-01`、`USER-BE-02`、`USER-BE-03`
   - `AUTH-FE-01`、`APP-FE-01`、`USER-FE-01`、`USER-FE-02`
-  - `ADMIN-BE-03`、`ADMIN-BE-04`
+  - `ADMIN-BE-03`、`ADMIN-BE-04`、`ADMIN-BE-05`、`ADMIN-BE-06`
   - `MODEL-BE-01`
   - `CHAT-BE-01`、`CHAT-BE-02`、`CHAT-BE-03`、`CHAT-BE-05`
   - `GROUP-BE-01`
@@ -32,16 +33,29 @@
   - `ADMIN-BE-01`
   - `ADMIN-BE-02`
   - `CHAT-BE-03` ~ `CHAT-BE-08`
+  - `ADMIN-BE-07` 的“停用/删除前检查”后续仍待补
 
 当前已经可以稳定支撑：
 
 - 注册 / 登录 / 当前用户 / 个人设置 / 安全设置 / 用量页联调
 - Admin 上游 / 模型 / 用户调额 / 审计日志联调
 - Admin 渠道 / 用户组 / 分组限额 / 用户限额调整联调
+- Admin 上游 / 渠道 / 模型 / 用户组详情联调
+- Admin 上游模型发现与模型导入联调
+- Admin 模型 human-readable 返回联调
 - Chat 非流式主链路联调：`/api/v1/chat/completions -> upstream -> messages -> llm_request_logs`
 - Chat 流式主链路联调：`/api/v1/chat/completions(stream=true) -> SSE -> messages -> llm_request_logs`
 - Chat 侧模型列表、会话 CRUD、消息列表联调
 - Swagger UI 联调入口：`/swagger/index.html`
+
+当前已明确需要继续收敛的一条支线：
+
+- 管理控制台需要从“开发骨架”升级到“可运营维护”
+- 重点问题包括：
+  - 模型需改成“上游发现 + 导入”
+  - 管理台默认不再直出 UUID
+  - `channel` 需收敛为高级配置语义
+  - 上游 / 渠道 / 模型 / 用户组需补详情、编辑与安全停用策略
 
 ## 1. 使用方式
 
@@ -131,6 +145,10 @@
 | `ADMIN-BE-02` | 实现模型 CRUD API、可见用户组配置与渠道路由绑定保存 | Backend | P0 | L | `DB-02`、`ADMIN-BE-01` | 模型、可见用户组和优先级绑定可维护 |
 | `ADMIN-BE-03` | 实现用户查询与人工调额 API | Backend | P0 | M | `DB-03`、`DB-04` | 可按用户调额并写账本/审计 |
 | `ADMIN-BE-04` | 实现审计日志查询 API | Backend | P0 | S | `DB-04` | 后台可查关键操作日志 |
+| `ADMIN-BE-05` | 实现上游模型发现接口与标准化候选模型返回 | Backend | P0 | M | `ADMIN-BE-01`、`CHAT-BE-03` | 可从指定 upstream 拉取候选模型，并统一成管理台可导入格式 |
+| `ADMIN-BE-06` | 实现模型导入接口与 admin human-readable 关联返回 | Backend | P0 | L | `ADMIN-BE-02`、`ADMIN-BE-05`、`GROUP-BE-01` | 已完成第一版：模型导入接口可用，模型返回已补用户组名、渠道名、上游名与 summary，不再只暴露 UUID |
+| `ADMIN-BE-07` | 补上游/渠道/模型/用户组单资源详情接口 | Backend | P0 | M | `ADMIN-BE-01`、`ADMIN-BE-02`、`GROUP-BE-01` | 已完成第一版：详情接口可用；后续继续补停用/删除前检查与编辑体验 |
+| `ADMIN-BE-08` | 建立管理资源安全停用/删除策略 | Backend | P0 | M | `ADMIN-BE-07`、`DB-02` | 优先支持停用；删除需经过引用检查并明确语义 |
 | `GROUP-BE-01` | 实现 `user_groups` CRUD 与单用户归属维护 API | Backend | P0 | M | `DB-01`、`AUTH-BE-02` | 管理员可维护用户组与用户归属，并供模型可见性与限额策略使用 |
 | `LIMIT-BE-01` | 实现用户组模型限额模板 API | Backend | P0 | M | `DB-01`、`DB-02`、`AUTH-BE-02` | 可批量维护默认模板与模型覆盖规则 |
 | `LIMIT-BE-02` | 实现用户限额使用统计与 direct adjustment API | Backend | P0 | M | `LIMIT-BE-01`、`DB-03`、`AUTH-BE-02` | 可查询 hour/week/lifetime 使用与剩余额度，并记录单用户调整 |
@@ -140,6 +158,9 @@
 | `ADMIN-FE-03` | 模型管理页 | Frontend | P0 | M | `ADMIN-BE-02`、`GROUP-BE-01` | 能维护模型、可见组与优先级 |
 | `ADMIN-FE-04` | 用户管理页 | Frontend | P0 | M | `ADMIN-BE-03`、`GROUP-BE-01` | 能查用户、调额并维护用户组归属 |
 | `ADMIN-FE-05` | 审计日志页 | Frontend | P0 | S | `ADMIN-BE-04` | 能筛查关键审计记录 |
+| `ADMIN-FE-07` | 模型发现、勾选导入与路由规则编辑页 | Frontend | P0 | L | `ADMIN-BE-05`、`ADMIN-BE-06` | 管理员可从 upstream 拉模型并导入，路由规则可视化编辑 |
+| `ADMIN-FE-08` | 上游/渠道/模型/用户组详情与编辑页 | Frontend | P0 | M | `ADMIN-BE-07` | 管理台从“新增 + 列表”升级到可维护资源 |
+| `ADMIN-FE-09` | 管理台 human-readable 展示清理 | Frontend | P0 | M | `ADMIN-BE-06`、`ADMIN-FE-08` | 除审计日志外，主界面不再直接展示 UUID |
 
 ## 7. M3：Chat 后端闭环
 

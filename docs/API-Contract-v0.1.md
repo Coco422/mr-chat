@@ -768,11 +768,147 @@ data: [DONE]
 
 - 用于修改状态、密钥、备注、超时与冷却参数
 
-## 11.6 `GET /api/v1/admin/models`
+## 11.6 `GET /api/v1/admin/upstreams/:id`
+
+- 返回单个 upstream 详情
+- 当前读接口会对 `auth_config` 中的敏感字段做脱敏展示，例如：
+  - `api_key`
+  - `token`
+  - `password`
+
+## 11.7 `GET /api/v1/admin/upstreams/:id/discovered-models`
+
+- 从指定 upstream 的 `/v1/models` 拉取候选模型
+- 当前第一版按 OpenAI 兼容接口实现
+- 返回值会标记：
+  - `already_imported`
+  - `existing_model`
+
+响应示例：
+
+```json
+{
+  "success": true,
+  "data": {
+    "upstream": {
+      "id": "uuid",
+      "name": "LAN newapi",
+      "provider_type": "openai",
+      "status": "active"
+    },
+    "items": [
+      {
+        "model_key": "Qwen/Qwen3.5-122B-A10B",
+        "display_name": "Qwen/Qwen3.5-122B-A10B",
+        "provider_type": "openai",
+        "supported_endpoint_types": ["openai"],
+        "already_imported": true,
+        "existing_model": {
+          "id": "uuid",
+          "model_key": "Qwen/Qwen3.5-122B-A10B",
+          "display_name": "Qwen/Qwen3.5-122B-A10B",
+          "status": "active"
+        }
+      }
+    ],
+    "fetched_at": "2026-03-21T08:19:41Z",
+    "summary": {
+      "total": 2,
+      "already_imported": 1,
+      "new_candidates": 1
+    }
+  },
+  "request_id": "req_123"
+}
+```
+
+## 11.8 `GET /api/v1/admin/channels`
+
+- 返回渠道列表
+
+## 11.9 `GET /api/v1/admin/channels/:id`
+
+- 返回单个渠道详情
+
+## 11.10 `POST /api/v1/admin/channels`
+
+请求：
+
+```json
+{
+  "name": "default-openai",
+  "description": "default billing channel",
+  "status": "active",
+  "billing_config": {
+    "currency": "USD"
+  },
+  "metadata": {}
+}
+```
+
+## 11.11 `PUT /api/v1/admin/channels/:id`
+
+- 用于修改渠道状态、描述与计费配置
+
+## 11.12 `GET /api/v1/admin/models`
 
 - 返回模型与其路由配置摘要
+- 当前返回值除了保留写路径字段：
+  - `visible_user_group_ids`
+  - `route_bindings[].channel_id`
+  - `route_bindings[].upstream_id`
+- 也会额外补充人类可读字段：
+  - `visible_user_groups`
+  - `visibility_summary`
+  - `route_bindings[].channel`
+  - `route_bindings[].upstream`
+  - `route_bindings[].summary`
+  - `route_rule_summaries`
 
-## 11.7 `POST /api/v1/admin/models`
+响应片段：
+
+```json
+{
+  "id": "uuid",
+  "model_key": "Qwen/Qwen3.5-122B-A10B",
+  "display_name": "Qwen/Qwen3.5-122B-A10B",
+  "visibility_summary": "vip-users",
+  "visible_user_group_ids": ["uuid"],
+  "visible_user_groups": [
+    {
+      "id": "uuid",
+      "name": "vip-users",
+      "status": "active"
+    }
+  ],
+  "route_bindings": [
+    {
+      "id": "uuid",
+      "channel_id": "uuid",
+      "upstream_id": "uuid",
+      "priority": 1,
+      "status": "active",
+      "channel": {
+        "id": "uuid",
+        "name": "default"
+      },
+      "upstream": {
+        "id": "uuid",
+        "name": "LAN newapi",
+        "status": "active"
+      },
+      "summary": "default -> LAN newapi (priority 1)"
+    }
+  ]
+}
+```
+
+## 11.13 `GET /api/v1/admin/models/:id`
+
+- 返回单个模型详情
+- 返回体结构与 `GET /api/v1/admin/models` 中的单项对象一致
+
+## 11.14 `POST /api/v1/admin/models`
 
 请求：
 
@@ -797,39 +933,81 @@ data: [DONE]
 }
 ```
 
-## 11.8 `PUT /api/v1/admin/models/:id`
+## 11.15 `POST /api/v1/admin/models/import`
 
-- 用于修改模型展示、定价、可见性与路由绑定
-
-## 11.9 `GET /api/v1/admin/channels`
-
-- 返回渠道列表
-
-## 11.10 `POST /api/v1/admin/channels`
+- 用于把“已发现的 upstream 模型”导入到本地模型目录
+- 第一版由前端把已发现的候选模型字段回传给后端；后端不会在导入时再次强制请求 upstream
+- 若 `model_key` 已存在，则不会报错，而是返回 `status = skipped_existing`
 
 请求：
 
 ```json
 {
-  "name": "default-openai",
-  "description": "default billing channel",
-  "status": "active",
-  "billing_config": {
-    "currency": "USD"
-  },
-  "metadata": {}
+  "upstream_id": "uuid",
+  "items": [
+    {
+      "model_key": "Qwen/Qwen3.5-122B-A10B",
+      "display_name": "Qwen/Qwen3.5-122B-A10B",
+      "provider_type": "openai",
+      "channel_id": "uuid",
+      "visible_user_group_ids": ["uuid"],
+      "status": "active",
+      "capabilities": {
+        "chat": true,
+        "streaming": true
+      },
+      "priority": 1
+    }
+  ]
 }
 ```
 
-## 11.11 `PUT /api/v1/admin/channels/:id`
+响应片段：
 
-- 用于修改渠道状态、描述与计费配置
+```json
+{
+  "success": true,
+  "data": {
+    "upstream": {
+      "id": "uuid",
+      "name": "LAN newapi"
+    },
+    "items": [
+      {
+        "requested_model_key": "Qwen/Qwen3.5-122B-A10B",
+        "status": "skipped_existing",
+        "existing_model": {
+          "id": "uuid",
+          "model_key": "Qwen/Qwen3.5-122B-A10B",
+          "display_name": "Qwen/Qwen3.5-122B-A10B",
+          "status": "active"
+        },
+        "model": null
+      }
+    ],
+    "summary": {
+      "requested": 1,
+      "imported": 0,
+      "skipped_existing": 1
+    }
+  },
+  "request_id": "req_123"
+}
+```
 
-## 11.12 `GET /api/v1/admin/user-groups`
+## 11.16 `PUT /api/v1/admin/models/:id`
+
+- 用于修改模型展示、定价、可见性与路由绑定
+
+## 11.17 `GET /api/v1/admin/user-groups`
 
 - 返回用户分组列表
 
-## 11.13 `POST /api/v1/admin/user-groups`
+## 11.18 `GET /api/v1/admin/user-groups/:id`
+
+- 返回单个用户分组详情
+
+## 11.19 `POST /api/v1/admin/user-groups`
 
 请求：
 
@@ -843,15 +1021,15 @@ data: [DONE]
 }
 ```
 
-## 11.14 `PUT /api/v1/admin/user-groups/:id`
+## 11.20 `PUT /api/v1/admin/user-groups/:id`
 
 - 用于修改分组名称、描述、状态和权限
 
-## 11.15 `GET /api/v1/admin/user-groups/:id/limits`
+## 11.21 `GET /api/v1/admin/user-groups/:id/limits`
 
 - 返回该用户分组的默认模板与模型覆盖规则列表
 
-## 11.16 `PUT /api/v1/admin/user-groups/:id/limits`
+## 11.22 `PUT /api/v1/admin/user-groups/:id/limits`
 
 请求：
 
@@ -872,7 +1050,7 @@ data: [DONE]
 }
 ```
 
-## 11.17 `PUT /api/v1/admin/users/:id/group`
+## 11.23 `PUT /api/v1/admin/users/:id/group`
 
 请求：
 
@@ -882,7 +1060,7 @@ data: [DONE]
 }
 ```
 
-## 11.18 `GET /api/v1/admin/users/:id/limit-usage`
+## 11.24 `GET /api/v1/admin/users/:id/limit-usage`
 
 查询参数：
 
@@ -895,7 +1073,7 @@ data: [DONE]
 - 返回 `adjustments.hour/week/lifetime`
 - 返回 `remaining.hour/week/lifetime`
 
-## 11.19 `GET /api/v1/admin/users/:id/limit-adjustments`
+## 11.25 `GET /api/v1/admin/users/:id/limit-adjustments`
 
 查询参数：
 
@@ -903,7 +1081,7 @@ data: [DONE]
 - `page_size`
 - `model_id`
 
-## 11.20 `POST /api/v1/admin/users/:id/limit-adjustments`
+## 11.26 `POST /api/v1/admin/users/:id/limit-adjustments`
 
 请求：
 
@@ -917,7 +1095,7 @@ data: [DONE]
 }
 ```
 
-## 11.21 `POST /api/v1/admin/redeem-codes/batch`
+## 11.27 `POST /api/v1/admin/redeem-codes/batch`
 
 请求：
 
@@ -931,11 +1109,11 @@ data: [DONE]
 }
 ```
 
-## 11.22 `GET /api/v1/admin/redeem-codes`
+## 11.28 `GET /api/v1/admin/redeem-codes`
 
 - 返回兑换码批次与统计信息
 
-## 11.23 `GET /api/v1/admin/audit-logs`
+## 11.29 `GET /api/v1/admin/audit-logs`
 
 查询参数：
 
@@ -946,11 +1124,11 @@ data: [DONE]
 - `resource_type`
 - `result`
 
-## 11.24 `GET /api/v1/admin/service-entries`（P1）
+## 11.30 `GET /api/v1/admin/service-entries`（P1）
 
 - 返回服务入口配置列表
 
-## 11.25 `POST /api/v1/admin/service-entries`（P1）
+## 11.31 `POST /api/v1/admin/service-entries`（P1）
 
 请求：
 
@@ -965,7 +1143,7 @@ data: [DONE]
 }
 ```
 
-## 11.26 `PUT /api/v1/admin/service-entries/:id`（P1）
+## 11.32 `PUT /api/v1/admin/service-entries/:id`（P1）
 
 - 用于修改地址、模式、状态和可见组
 

@@ -27,6 +27,47 @@ definitions:
       status:
         type: string
     type: object
+  admin.importModelItemRequest:
+    properties:
+      capabilities:
+        additionalProperties: {}
+        type: object
+      channel_id:
+        type: string
+      context_length:
+        type: integer
+      display_name:
+        type: string
+      max_output_tokens:
+        type: integer
+      metadata:
+        additionalProperties: {}
+        type: object
+      model_key:
+        type: string
+      pricing:
+        additionalProperties: {}
+        type: object
+      priority:
+        type: integer
+      provider_type:
+        type: string
+      status:
+        type: string
+      visible_user_group_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  admin.importModelsRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/admin.importModelItemRequest'
+        type: array
+      upstream_id:
+        type: string
+    type: object
   admin.modelRequest:
     properties:
       capabilities:
@@ -367,6 +408,37 @@ paths:
       tags:
       - Admin
   /admin/channels/{id}:
+    get:
+      parameters:
+      - description: Channel ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get channel detail
+      tags:
+      - Admin
     put:
       consumes:
       - application/json
@@ -467,6 +539,37 @@ paths:
       tags:
       - Admin
   /admin/models/{id}:
+    get:
+      parameters:
+      - description: Model ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get model detail
+      tags:
+      - Admin
     put:
       consumes:
       - application/json
@@ -508,6 +611,47 @@ paths:
       security:
       - BearerAuth: []
       summary: Update model
+      tags:
+      - Admin
+  /admin/models/import:
+    post:
+      consumes:
+      - application/json
+      description: Import one or more discovered upstream models into the local platform
+        model catalog.
+      parameters:
+      - description: Import payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.importModelsRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Import discovered models
       tags:
       - Admin
   /admin/upstreams:
@@ -567,6 +711,37 @@ paths:
       tags:
       - Admin
   /admin/upstreams/{id}:
+    get:
+      parameters:
+      - description: Upstream ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get upstream detail
+      tags:
+      - Admin
     put:
       consumes:
       - application/json
@@ -608,6 +783,48 @@ paths:
       security:
       - BearerAuth: []
       summary: Update upstream
+      tags:
+      - Admin
+  /admin/upstreams/{id}/discovered-models:
+    get:
+      description: Fetch candidate models from the upstream `/v1/models` endpoint
+        and annotate whether they are already imported locally.
+      parameters:
+      - description: Upstream ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Discover upstream models
       tags:
       - Admin
   /admin/user-groups:
@@ -667,6 +884,37 @@ paths:
       tags:
       - Admin
   /admin/user-groups/{id}:
+    get:
+      parameters:
+      - description: User group ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpx.Envelope'
+      security:
+      - BearerAuth: []
+      summary: Get user group detail
+      tags:
+      - Admin
     put:
       consumes:
       - application/json

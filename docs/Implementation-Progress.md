@@ -1,8 +1,8 @@
 # MrChat 实现进度快照
 
 - 状态：首轮实现进行中
-- 日期：2026-03-18
-- 当前阶段：`M0/M1` 已完成，`M2` 大部分已落地，`M3` 已接通首个真实上游并进入聊天闭环细化
+- 日期：2026-03-21
+- 当前阶段：`M0/M1` 已完成，`M2` 已进入“管理台可维护化”收敛阶段，`M3` 已接通首个真实上游并进入聊天闭环细化
 
 ## 1. 当前结论
 
@@ -13,6 +13,7 @@
 - 后端工程骨架、配置加载、goose 迁移入口、基础鉴权和用户中心 API 已可用
 - 核心表结构已经落到 PostgreSQL，并支持服务启动自动迁移
 - 管理侧已具备上游、渠道、模型、用户组、用户调额、用户限额调整、审计日志的首版 API
+- 管理侧已补齐上游/渠道/模型/用户组详情接口，并进入“模型发现 + 导入 + human-readable 返回”的过渡阶段
 - Chat 侧已具备模型列表、会话 CRUD、消息分页查询、非流式与 SSE `/chat/completions`、用户限额前置校验、消息持久化和 `llm_request_logs` 落库
 - Swagger UI 已接入，可直接通过 `/swagger/index.html` 查看当前接口
 - 前端已提供无样式联调壳子，可直接对接登录、设置、用量、Chat 和主要 Admin 页面
@@ -61,15 +62,21 @@
   - `GET /swagger/doc.json`
 - Admin
   - `GET /api/v1/admin/upstreams`
+  - `GET /api/v1/admin/upstreams/:id`
+  - `GET /api/v1/admin/upstreams/:id/discovered-models`
   - `POST /api/v1/admin/upstreams`
   - `PUT /api/v1/admin/upstreams/:id`
   - `GET /api/v1/admin/channels`
+  - `GET /api/v1/admin/channels/:id`
   - `POST /api/v1/admin/channels`
   - `PUT /api/v1/admin/channels/:id`
   - `GET /api/v1/admin/models`
+  - `GET /api/v1/admin/models/:id`
+  - `POST /api/v1/admin/models/import`
   - `POST /api/v1/admin/models`
   - `PUT /api/v1/admin/models/:id`
   - `GET /api/v1/admin/user-groups`
+  - `GET /api/v1/admin/user-groups/:id`
   - `POST /api/v1/admin/user-groups`
   - `PUT /api/v1/admin/user-groups/:id`
   - `GET /api/v1/admin/user-groups/:id/limits`
@@ -112,6 +119,7 @@
 - `go run ./cmd/migrate status` 能识别局域网 PostgreSQL 上的 pending migration
 - `go run ./cmd/migrate up` 已将局域网 PostgreSQL 升到 version `6`
 - `go run ./cmd/api` 启动时日志显示 `goose: no migrations to run. current version: 6`
+- 新增 admin detail / import / human-readable 接口编译与烟雾验证通过
 
 ### 3.2 局域网 PostgreSQL 与 `newapi` 烟雾验证
 
@@ -130,6 +138,11 @@
 - 普通用户重新拉取 `/models` 后，能看到被 user group 放行的模型
 - 普通用户通过 `POST /api/v1/chat/completions` 发起真实非流式请求，服务端按数据库中的 `upstream + channel + route_binding` 解析上游
 - 普通用户通过 `POST /api/v1/chat/completions` + `stream=true` 发起真实 SSE 请求，已收到 `response.start`、`reasoning.delta`、`response.completed` 和 `[DONE]`
+- 管理员通过 `GET /api/v1/admin/upstreams/:id/discovered-models` 已能从局域网 `newapi` 拉取候选模型，并识别本地已导入模型
+- 管理员通过 `POST /api/v1/admin/models/import` 已能对已存在模型返回 `skipped_existing`，避免重复创建
+- 管理员通过 `GET /api/v1/admin/models/:id` 已能拿到 `visible_user_groups`、`visibility_summary` 和 hydrated `route_bindings`
+- 管理员通过 `GET /api/v1/admin/channels/:id` 与 `GET /api/v1/admin/user-groups/:id` 已能读取单资源详情
+- 上游读接口当前会对 `auth_config` 中的敏感字段做脱敏，不再直接回传明文 `api_key`
 - 会话、消息、usage 和 `llm_request_logs` 已成功落库，`limit_usage` 已体现请求次数与 token 消耗增量
 - Chat 最小联调页已切到 `fetch + SSE`，并支持最基本的“停止生成”
 
@@ -144,6 +157,13 @@
 - `stream_request_status = completed`
 - `stream_finish_reason = length`
 - `stream_total_tokens = 109`
+- `discovered_model_total = 2`
+- `discovery_already_imported = 2`
+- `import_requested = 1`
+- `import_skipped_existing = 1`
+- `model_detail_visibility_summary = lan-group-1773811857`
+- `model_detail_route_summary = lan-channel-1773811857 -> lan-newapi-1773811857 (priority 1)`
+- `masked_upstream_auth_config = true`
 - `remaining_hour_requests = 2`
 - `adjustment_count = 1`
 - `model_visible = true`
@@ -206,6 +226,12 @@
   - 已完成列表/创建/更新，删除与更细的资源管理尚未补齐
 - `ADMIN-BE-02`
   - 已完成列表/创建/更新与路由绑定保存，但更细的资源管理、删除与后续 P1 配置还未补齐
+- `ADMIN-BE-05`
+  - 已完成第一版：支持基于 upstream 的模型发现，并返回候选模型和本地已导入状态
+- `ADMIN-BE-06`
+  - 已完成第一版：支持模型导入接口，并在 admin 模型返回中补 `visible_user_groups`、hydrated `route_bindings` 和 human-readable summary
+- `ADMIN-BE-07`
+  - 已完成第一版：上游/渠道/模型/用户组详情接口已补齐；后续仍需继续补停用、删除前检查和编辑体验
 - `CHAT-BE-04`
   - 当前已按数据库配置选择可用 route binding 并完成单路由调用，但还没有真正做多上游故障切换、冷却窗口和 Redis 缓存
 - `CHAT-BE-05`

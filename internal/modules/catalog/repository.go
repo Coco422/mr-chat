@@ -41,6 +41,10 @@ func (r *Repository) ListUpstreams(ctx context.Context) ([]Upstream, error) {
 	return items, nil
 }
 
+func (r *Repository) GetUpstreamByID(ctx context.Context, upstreamID string) (*Upstream, error) {
+	return r.getUpstreamByID(ctx, r.db, upstreamID)
+}
+
 func (r *Repository) ListChannels(ctx context.Context) ([]Channel, error) {
 	var items []Channel
 	if err := r.db.WithContext(ctx).
@@ -50,6 +54,10 @@ func (r *Repository) ListChannels(ctx context.Context) ([]Channel, error) {
 	}
 
 	return items, nil
+}
+
+func (r *Repository) GetChannelByID(ctx context.Context, channelID string) (*Channel, error) {
+	return r.getChannelByID(ctx, r.db, channelID)
 }
 
 func (r *Repository) CreateChannel(ctx context.Context, input CreateChannelInput) (*Channel, error) {
@@ -336,6 +344,10 @@ func (r *Repository) UpdateModelWithDB(ctx context.Context, db *gorm.DB, modelID
 
 func (r *Repository) GetModelByID(ctx context.Context, modelID string) (*ModelWithBindings, error) {
 	return r.getModelWithBindingsByID(ctx, r.db, modelID)
+}
+
+func (r *Repository) ListModelsByRows(ctx context.Context, models []Model) ([]ModelWithBindings, error) {
+	return r.attachBindings(ctx, r.db, models)
 }
 
 func (r *Repository) attachBindings(ctx context.Context, db *gorm.DB, models []Model) ([]ModelWithBindings, error) {

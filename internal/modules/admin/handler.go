@@ -2,6 +2,7 @@ package admin
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -54,6 +55,26 @@ type modelRequest struct {
 	Status              string                      `json:"status"`
 	Metadata            map[string]any              `json:"metadata"`
 	RouteBindings       []catalog.RouteBindingInput `json:"route_bindings"`
+}
+
+type importModelsRequest struct {
+	UpstreamID string                   `json:"upstream_id"`
+	Items      []importModelItemRequest `json:"items"`
+}
+
+type importModelItemRequest struct {
+	ModelKey            string         `json:"model_key"`
+	DisplayName         string         `json:"display_name"`
+	ProviderType        string         `json:"provider_type"`
+	ContextLength       int            `json:"context_length"`
+	MaxOutputTokens     *int           `json:"max_output_tokens"`
+	Pricing             map[string]any `json:"pricing"`
+	Capabilities        map[string]any `json:"capabilities"`
+	VisibleUserGroupIDs []string       `json:"visible_user_group_ids"`
+	Status              string         `json:"status"`
+	Metadata            map[string]any `json:"metadata"`
+	ChannelID           *string        `json:"channel_id"`
+	Priority            int            `json:"priority"`
 }
 
 type userGroupRequest struct {
@@ -116,6 +137,51 @@ func (h *Handler) ListUpstreams(c *gin.Context) {
 		return
 	}
 	httpx.Success(c, http.StatusOK, toUpstreams(items))
+}
+
+// GetUpstream godoc
+// @Summary Get upstream detail
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Upstream ID"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/upstreams/{id} [get]
+func (h *Handler) GetUpstream(c *gin.Context) {
+	item, err := h.service.GetUpstream(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toUpstream(item))
+}
+
+// DiscoverUpstreamModels godoc
+// @Summary Discover upstream models
+// @Description Fetch candidate models from the upstream `/v1/models` endpoint and annotate whether they are already imported locally.
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Upstream ID"
+// @Success 200 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Failure 502 {object} httpx.Envelope
+// @Router /admin/upstreams/{id}/discovered-models [get]
+func (h *Handler) DiscoverUpstreamModels(c *gin.Context) {
+	result, err := h.service.DiscoverUpstreamModels(c.Request.Context(), actorFromContext(c), c.Param("id"))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toUpstreamDiscoveryResult(result))
 }
 
 // CreateUpstream godoc
@@ -203,6 +269,27 @@ func (h *Handler) ListChannels(c *gin.Context) {
 		return
 	}
 	httpx.Success(c, http.StatusOK, toChannels(items))
+}
+
+// GetChannel godoc
+// @Summary Get channel detail
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Channel ID"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/channels/{id} [get]
+func (h *Handler) GetChannel(c *gin.Context) {
+	item, err := h.service.GetChannel(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toChannel(item))
 }
 
 // CreateChannel godoc
@@ -293,6 +380,27 @@ func (h *Handler) ListModels(c *gin.Context) {
 	httpx.Success(c, http.StatusOK, toAdminModels(items))
 }
 
+// GetModel godoc
+// @Summary Get model detail
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Model ID"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/models/{id} [get]
+func (h *Handler) GetModel(c *gin.Context) {
+	item, err := h.service.GetModel(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toAdminModel(*item))
+}
+
 // CreateModel godoc
 // @Summary Create model
 // @Tags Admin
@@ -330,7 +438,13 @@ func (h *Handler) CreateModel(c *gin.Context) {
 		return
 	}
 
-	httpx.Success(c, http.StatusCreated, toAdminModel(*item))
+	view, err := h.service.GetModel(c.Request.Context(), item.Model.ID)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusCreated, toAdminModel(*view))
 }
 
 // UpdateModel godoc
@@ -372,7 +486,64 @@ func (h *Handler) UpdateModel(c *gin.Context) {
 		return
 	}
 
-	httpx.Success(c, http.StatusOK, toAdminModel(*item))
+	view, err := h.service.GetModel(c.Request.Context(), item.Model.ID)
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toAdminModel(*view))
+}
+
+// ImportModels godoc
+// @Summary Import discovered models
+// @Description Import one or more discovered upstream models into the local platform model catalog.
+// @Tags Admin
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body importModelsRequest true "Import payload"
+// @Success 201 {object} httpx.Envelope
+// @Failure 400 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/models/import [post]
+func (h *Handler) ImportModels(c *gin.Context) {
+	var req importModelsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httpx.Failure(c, http.StatusBadRequest, "VALIDATION_ERROR", "Invalid model import payload", gin.H{"error": err.Error()})
+		return
+	}
+
+	inputs := make([]ImportModelItemInput, 0, len(req.Items))
+	for _, item := range req.Items {
+		inputs = append(inputs, ImportModelItemInput{
+			ModelKey:            item.ModelKey,
+			DisplayName:         item.DisplayName,
+			ProviderType:        item.ProviderType,
+			ContextLength:       item.ContextLength,
+			MaxOutputTokens:     item.MaxOutputTokens,
+			Pricing:             item.Pricing,
+			Capabilities:        item.Capabilities,
+			VisibleUserGroupIDs: item.VisibleUserGroupIDs,
+			Status:              item.Status,
+			Metadata:            item.Metadata,
+			ChannelID:           item.ChannelID,
+			Priority:            item.Priority,
+		})
+	}
+
+	result, err := h.service.ImportModels(c.Request.Context(), actorFromContext(c), ImportModelsInput{
+		UpstreamID: req.UpstreamID,
+		Items:      inputs,
+	})
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusCreated, toImportModelsResult(result))
 }
 
 // ListUserGroups godoc
@@ -391,6 +562,27 @@ func (h *Handler) ListUserGroups(c *gin.Context) {
 		return
 	}
 	httpx.Success(c, http.StatusOK, toUserGroups(items))
+}
+
+// GetUserGroup godoc
+// @Summary Get user group detail
+// @Tags Admin
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "User group ID"
+// @Success 200 {object} httpx.Envelope
+// @Failure 401 {object} httpx.Envelope
+// @Failure 403 {object} httpx.Envelope
+// @Failure 404 {object} httpx.Envelope
+// @Router /admin/user-groups/{id} [get]
+func (h *Handler) GetUserGroup(c *gin.Context) {
+	item, err := h.service.GetUserGroup(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		h.handleError(c, err)
+		return
+	}
+
+	httpx.Success(c, http.StatusOK, toUserGroup(item))
 }
 
 // CreateUserGroup godoc
@@ -775,6 +967,12 @@ func (h *Handler) handleError(c *gin.Context, err error) {
 		httpx.Failure(c, http.StatusNotFound, "USER_GROUP_NOT_FOUND", "User group not found", nil)
 	case errors.Is(err, ErrQuotaWouldBecomeNegative):
 		httpx.Failure(c, http.StatusBadRequest, "QUOTA_NEGATIVE_NOT_ALLOWED", "Quota cannot become negative", nil)
+	case errors.Is(err, ErrUpstreamDiscoveryUnsupported):
+		httpx.Failure(c, http.StatusBadRequest, "UPSTREAM_DISCOVERY_UNSUPPORTED", "The current upstream provider does not support model discovery yet", nil)
+	case errors.Is(err, ErrUpstreamDiscoveryFailed):
+		httpx.Failure(c, http.StatusBadGateway, "UPSTREAM_DISCOVERY_FAILED", "Failed to fetch model list from upstream", nil)
+	case errors.Is(err, ErrModelImportInvalid):
+		httpx.Failure(c, http.StatusBadRequest, "MODEL_IMPORT_INVALID", "Invalid model import payload", nil)
 	default:
 		h.internalError(c)
 	}
@@ -855,7 +1053,7 @@ func toUpstream(item *catalog.Upstream) gin.H {
 		"provider_type":     item.ProviderType,
 		"base_url":          item.BaseURL,
 		"auth_type":         item.AuthType,
-		"auth_config":       item.AuthConfig,
+		"auth_config":       sanitizeAuthConfig(item.AuthConfig),
 		"status":            item.Status,
 		"timeout_seconds":   item.TimeoutSeconds,
 		"cooldown_seconds":  item.CooldownSeconds,
@@ -863,6 +1061,45 @@ func toUpstream(item *catalog.Upstream) gin.H {
 		"metadata":          item.Metadata,
 		"created_at":        item.CreatedAt.UTC().Format(timeLayout),
 		"updated_at":        item.UpdatedAt.UTC().Format(timeLayout),
+	}
+}
+
+func toUpstreamDiscoveryResult(result *UpstreamModelDiscoveryResult) gin.H {
+	if result == nil {
+		return gin.H{}
+	}
+
+	items := make([]gin.H, 0, len(result.Items))
+	for _, item := range result.Items {
+		entry := gin.H{
+			"model_key":                item.ModelKey,
+			"display_name":             item.DisplayName,
+			"provider_type":            item.ProviderType,
+			"object":                   item.Object,
+			"owned_by":                 item.OwnedBy,
+			"supported_endpoint_types": item.SupportedEndpointTypes,
+			"capabilities":             item.Capabilities,
+			"raw":                      item.Raw,
+			"already_imported":         item.AlreadyImported,
+		}
+		if item.ExistingModel != nil {
+			entry["existing_model"] = gin.H{
+				"id":           item.ExistingModel.ID,
+				"model_key":    item.ExistingModel.ModelKey,
+				"display_name": item.ExistingModel.DisplayName,
+				"status":       item.ExistingModel.Status,
+			}
+		} else {
+			entry["existing_model"] = nil
+		}
+		items = append(items, entry)
+	}
+
+	return gin.H{
+		"upstream":   toUpstream(result.Upstream),
+		"items":      items,
+		"fetched_at": result.FetchedAt,
+		"summary":    result.Summary,
 	}
 }
 
@@ -890,7 +1127,7 @@ func toChannel(item *catalog.Channel) gin.H {
 	}
 }
 
-func toAdminModels(items []catalog.ModelWithBindings) []gin.H {
+func toAdminModels(items []AdminModelView) []gin.H {
 	result := make([]gin.H, 0, len(items))
 	for _, item := range items {
 		result = append(result, toAdminModel(item))
@@ -898,33 +1135,106 @@ func toAdminModels(items []catalog.ModelWithBindings) []gin.H {
 	return result
 }
 
-func toAdminModel(item catalog.ModelWithBindings) gin.H {
-	bindings := make([]gin.H, 0, len(item.RouteBindings))
-	for _, binding := range item.RouteBindings {
+func toAdminModel(item AdminModelView) gin.H {
+	bindings := make([]gin.H, 0, len(item.HydratedBindings))
+	for _, binding := range item.HydratedBindings {
+		var channel any
+		if binding.Channel != nil {
+			channel = gin.H{
+				"id":          binding.Channel.ID,
+				"name":        binding.Channel.Name,
+				"description": binding.Channel.Description,
+				"status":      binding.Channel.Status,
+			}
+		}
+
+		var upstream any
+		if binding.Upstream != nil {
+			upstream = gin.H{
+				"id":            binding.Upstream.ID,
+				"name":          binding.Upstream.Name,
+				"provider_type": binding.Upstream.ProviderType,
+				"status":        binding.Upstream.Status,
+				"base_url":      binding.Upstream.BaseURL,
+			}
+		}
+
 		bindings = append(bindings, gin.H{
-			"id":          binding.ID,
-			"channel_id":  binding.ChannelID,
-			"upstream_id": binding.UpstreamID,
-			"priority":    binding.Priority,
-			"status":      binding.Status,
+			"id":          binding.Binding.ID,
+			"channel_id":  binding.Binding.ChannelID,
+			"upstream_id": binding.Binding.UpstreamID,
+			"priority":    binding.Binding.Priority,
+			"status":      binding.Binding.Status,
+			"channel":     channel,
+			"upstream":    upstream,
+			"summary":     summarizeRouteBinding(binding.Binding, binding.Channel, binding.Upstream),
+		})
+	}
+
+	visibleUserGroups := make([]gin.H, 0, len(item.VisibleUserGroups))
+	for _, group := range item.VisibleUserGroups {
+		visibleUserGroups = append(visibleUserGroups, gin.H{
+			"id":          group.ID,
+			"name":        group.Name,
+			"description": group.Description,
+			"status":      group.Status,
 		})
 	}
 
 	return gin.H{
-		"id":                     item.Model.ID,
-		"model_key":              item.Model.ModelKey,
-		"display_name":           item.Model.DisplayName,
-		"provider_type":          item.Model.ProviderType,
-		"context_length":         item.Model.ContextLength,
-		"max_output_tokens":      item.Model.MaxOutputTokens,
-		"pricing":                item.Model.Pricing,
-		"capabilities":           item.Model.Capabilities,
-		"visible_user_group_ids": item.Model.VisibleUserGroupIDs,
-		"status":                 item.Model.Status,
-		"metadata":               item.Model.Metadata,
+		"id":                     item.Item.Model.ID,
+		"model_key":              item.Item.Model.ModelKey,
+		"display_name":           item.Item.Model.DisplayName,
+		"provider_type":          item.Item.Model.ProviderType,
+		"context_length":         item.Item.Model.ContextLength,
+		"max_output_tokens":      item.Item.Model.MaxOutputTokens,
+		"pricing":                item.Item.Model.Pricing,
+		"capabilities":           item.Item.Model.Capabilities,
+		"visible_user_group_ids": item.Item.Model.VisibleUserGroupIDs,
+		"visible_user_groups":    visibleUserGroups,
+		"visibility_summary":     item.VisibilitySummary,
+		"status":                 item.Item.Model.Status,
+		"metadata":               item.Item.Model.Metadata,
 		"route_bindings":         bindings,
-		"created_at":             item.Model.CreatedAt.UTC().Format(timeLayout),
-		"updated_at":             item.Model.UpdatedAt.UTC().Format(timeLayout),
+		"route_rule_summaries":   item.RouteRuleSummaries,
+		"created_at":             item.Item.Model.CreatedAt.UTC().Format(timeLayout),
+		"updated_at":             item.Item.Model.UpdatedAt.UTC().Format(timeLayout),
+	}
+}
+
+func toImportModelsResult(result *ImportModelsResult) gin.H {
+	if result == nil {
+		return gin.H{}
+	}
+
+	items := make([]gin.H, 0, len(result.Items))
+	for _, item := range result.Items {
+		entry := gin.H{
+			"requested_model_key": item.RequestedModelKey,
+			"status":              item.Status,
+		}
+		if item.ExistingModel != nil {
+			entry["existing_model"] = gin.H{
+				"id":           item.ExistingModel.ID,
+				"model_key":    item.ExistingModel.ModelKey,
+				"display_name": item.ExistingModel.DisplayName,
+				"status":       item.ExistingModel.Status,
+			}
+		} else {
+			entry["existing_model"] = nil
+		}
+		if item.Model != nil {
+			entry["model"] = toAdminModel(*item.Model)
+		} else {
+			entry["model"] = nil
+		}
+		items = append(items, entry)
+	}
+
+	return gin.H{
+		"upstream": toUpstream(result.Upstream),
+		"items":    items,
+		"summary":  result.Summary,
 	}
 }
 
@@ -1056,3 +1366,33 @@ func formatOptionalTime(value *time.Time) any {
 }
 
 const timeLayout = "2006-01-02T15:04:05Z07:00"
+
+func sanitizeAuthConfig(value map[string]any) map[string]any {
+	if len(value) == 0 {
+		return map[string]any{}
+	}
+
+	result := make(map[string]any, len(value))
+	for key, rawValue := range value {
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "api_key", "token", "access_token", "authorization", "password":
+			result[key] = maskSecretValue(rawValue)
+			result[key+"_configured"] = strings.TrimSpace(fmt.Sprint(rawValue)) != ""
+		default:
+			result[key] = rawValue
+		}
+	}
+
+	return result
+}
+
+func maskSecretValue(value any) any {
+	raw := strings.TrimSpace(fmt.Sprint(value))
+	if raw == "" {
+		return nil
+	}
+	if len(raw) <= 8 {
+		return "***"
+	}
+	return raw[:4] + strings.Repeat("*", len(raw)-8) + raw[len(raw)-4:]
+}
