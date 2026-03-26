@@ -56,8 +56,24 @@
                   </section>
 
                   <section class="message-panel answer-panel" :class="{ streaming: message.status === 'streaming' }">
-                    <div v-if="message.reasoning_content" class="panel-label">正式回答</div>
-                    <div class="markdown-body" v-html="renderMarkdown(assistantDisplayContent(message))"></div>
+                    <div v-if="message.reasoning_content || message.status === 'streaming'" class="answer-panel-header">
+                      <div v-if="message.reasoning_content" class="panel-label">正式回答</div>
+                      <div v-if="message.status === 'streaming'" class="streaming-indicator" aria-label="生成中">
+                        <span class="streaming-dot"></span>
+                        <span class="streaming-dot"></span>
+                        <span class="streaming-dot"></span>
+                      </div>
+                    </div>
+                    <div
+                      v-if="assistantHasContent(message)"
+                      class="markdown-body"
+                      v-html="renderMarkdown(assistantDisplayContent(message))"
+                    ></div>
+                    <div v-else-if="message.status === 'streaming'" class="streaming-placeholder" aria-hidden="true">
+                      <span class="streaming-dot"></span>
+                      <span class="streaming-dot"></span>
+                      <span class="streaming-dot"></span>
+                    </div>
                   </section>
                 </template>
 
@@ -78,7 +94,7 @@
 
                 <div v-else class="user-content">{{ message.content }}</div>
 
-                <div v-if="message.status !== 'completed'" class="message-status">{{ statusLabel(message.status) }}</div>
+                <div v-if="shouldShowStatus(message.status)" class="message-status">{{ statusLabel(message.status) }}</div>
 
                 <div class="message-tools">
                   <template v-if="message.role === 'assistant'">
@@ -183,9 +199,7 @@
               @click="handlePrimaryAction"
             >
               <svg v-if="sending" viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="4.5" y="7.5" width="3" height="9" rx="1.5" fill="#ffffff"></rect>
-                <rect x="10.5" y="5.25" width="3" height="13.5" rx="1.5" fill="#ffffff"></rect>
-                <rect x="16.5" y="8.75" width="3" height="6.5" rx="1.5" fill="#ffffff"></rect>
+                <rect x="7" y="7" width="10" height="10" rx="2.2" fill="#ffffff"></rect>
               </svg>
               <svg v-else viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="#ffffff" d="M12 4.5c.4 0 .78.16 1.06.44l5 5a1.5 1.5 0 0 1-2.12 2.12l-2.44-2.44V18a1.5 1.5 0 0 1-3 0V9.62l-2.44 2.44a1.5 1.5 0 0 1-2.12-2.12l5-5A1.5 1.5 0 0 1 12 4.5Z"></path>
@@ -253,6 +267,8 @@ const typewriterTimer = ref<number | null>(null)
 const typewriterPromptIndex = ref(0)
 const typewriterCharIndex = ref(0)
 const typewriterDeleting = ref(false)
+let pendingScrollBehavior: ScrollBehavior = 'auto'
+let scrollScheduled = false
 
 const emptyStatePrompts = [
   '选择模型后，在这里直接输入你的问题。',
@@ -439,17 +455,10 @@ async function runCompletion(options: {
             assistantMessageID = event.assistant_message_id
             break
           case 'response.delta':
-            patchMessage(assistantMessageID, {
-              content: currentMessageValue(assistantMessageID, 'content') + (event.delta.content ?? ''),
-              status: 'streaming'
-            })
+            appendMessageValue(assistantMessageID, 'content', event.delta.content ?? '')
             break
           case 'reasoning.delta':
-            patchMessage(assistantMessageID, {
-              reasoning_content:
-                currentMessageValue(assistantMessageID, 'reasoning_content') + (event.delta.reasoning_content ?? ''),
-              status: 'streaming'
-            })
+            appendMessageValue(assistantMessageID, 'reasoning_content', event.delta.reasoning_content ?? '')
             break
           case 'response.completed':
             patchMessage(assistantMessageID, {
@@ -497,18 +506,44 @@ function stopStreaming() {
   streamAbortController.value?.abort()
 }
 
+function findMessageIndex(messageID: string) {
+  return messages.value.findIndex((item) => item.id === messageID)
+}
+
 function patchMessage(messageID: string, patch: Partial<MessageItem>) {
-  messages.value = messages.value.map((item) => (item.id === messageID ? { ...item, ...patch } : item))
+  const messageIndex = findMessageIndex(messageID)
+  if (messageIndex === -1) {
+    return
+  }
+
+  Object.assign(messages.value[messageIndex], patch)
   scrollMessagesToBottom()
 }
 
 function replaceMessageID(currentID: string, nextID: string) {
-  messages.value = messages.value.map((item) => (item.id === currentID ? { ...item, id: nextID } : item))
+  const messageIndex = findMessageIndex(currentID)
+  if (messageIndex === -1) {
+    return
+  }
+
+  messages.value[messageIndex].id = nextID
   scrollMessagesToBottom()
 }
 
-function currentMessageValue(messageID: string, field: 'content' | 'reasoning_content') {
-  return messages.value.find((item) => item.id === messageID)?.[field] ?? ''
+function appendMessageValue(messageID: string, field: 'content' | 'reasoning_content', delta: string) {
+  if (!delta) {
+    return
+  }
+
+  const messageIndex = findMessageIndex(messageID)
+  if (messageIndex === -1) {
+    return
+  }
+
+  const message = messages.value[messageIndex]
+  message[field] += delta
+  message.status = 'streaming'
+  scrollMessagesToBottom()
 }
 
 function isAbortError(error: unknown) {
@@ -526,14 +561,32 @@ function toErrorMessage(error: unknown) {
 }
 
 function scrollMessagesToBottom(behavior: ScrollBehavior = 'auto') {
+  pendingScrollBehavior = behavior === 'smooth' ? 'smooth' : pendingScrollBehavior
+  if (scrollScheduled) {
+    return
+  }
+
+  if (pendingScrollBehavior !== 'smooth') {
+    pendingScrollBehavior = behavior
+  }
+
+  scrollScheduled = true
+
   nextTick(() => {
-    const element = messagesViewport.value
-    if (!element) {
-      return
-    }
-    element.scrollTo({
-      top: element.scrollHeight,
-      behavior
+    window.requestAnimationFrame(() => {
+      scrollScheduled = false
+
+      const element = messagesViewport.value
+      const nextBehavior = pendingScrollBehavior
+      pendingScrollBehavior = 'auto'
+      if (!element) {
+        return
+      }
+
+      element.scrollTo({
+        top: element.scrollHeight,
+        behavior: nextBehavior
+      })
     })
   })
 }
@@ -631,8 +684,16 @@ function statusLabel(status: string) {
   return status
 }
 
+function shouldShowStatus(status: string) {
+  return status !== 'completed' && status !== 'streaming'
+}
+
 function assistantDisplayContent(message: MessageItem) {
-  return message.content || (message.status === 'streaming' ? '正在生成中...' : '')
+  return message.content
+}
+
+function assistantHasContent(message: MessageItem) {
+  return Boolean(message.content.trim())
 }
 
 function renderMarkdown(content: string) {
@@ -898,6 +959,7 @@ function runEmptyStateTypewriterTick() {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-anchor: none;
   padding-right: 0.35rem;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -990,10 +1052,61 @@ function runEmptyStateTypewriterTick() {
   padding-top: 0.1rem;
 }
 
+.answer-panel-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 1rem;
+}
+
 .panel-label {
   color: var(--text-secondary);
   font-size: 0.78rem;
   letter-spacing: 0.03em;
+}
+
+.streaming-indicator,
+.streaming-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--text-secondary);
+}
+
+.streaming-placeholder {
+  min-height: 1.4rem;
+  padding: 0.1rem 0;
+}
+
+.streaming-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.28;
+  animation: streaming-dot-bounce 1.05s ease-in-out infinite;
+}
+
+.streaming-dot:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.streaming-dot:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes streaming-dot-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.28;
+  }
+
+  40% {
+    transform: translateY(-3px);
+    opacity: 0.9;
+  }
 }
 
 .user-content {
@@ -1186,7 +1299,7 @@ function runEmptyStateTypewriterTick() {
 }
 
 .send-btn-stop {
-  background: #dc2626;
+  background: #c44536;
 }
 
 .send-btn svg {
@@ -1201,7 +1314,7 @@ function runEmptyStateTypewriterTick() {
 }
 
 .send-btn-stop:hover:not(:disabled) {
-  background: #b91c1c;
+  background: #a83a2e;
 }
 
 .send-btn:disabled {
