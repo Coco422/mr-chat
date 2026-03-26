@@ -35,7 +35,7 @@
       </div>
 
       <div v-else class="chat-body" :class="{ 'chat-body-empty': !hasMessages }">
-        <div v-if="hasMessages" ref="messagesViewport" class="messages-viewport">
+        <div v-if="hasMessages" ref="messagesViewport" class="messages-viewport" @scroll="handleMessagesScroll">
           <ul class="message-list">
             <li
               v-for="(message, index) in messages"
@@ -56,20 +56,18 @@
                   </section>
 
                   <section class="message-panel answer-panel" :class="{ streaming: message.status === 'streaming' }">
-                    <div v-if="message.reasoning_content || message.status === 'streaming'" class="answer-panel-header">
-                      <div v-if="message.reasoning_content" class="panel-label">正式回答</div>
-                      <div v-if="message.status === 'streaming'" class="streaming-indicator" aria-label="生成中">
-                        <span class="streaming-dot"></span>
-                        <span class="streaming-dot"></span>
-                        <span class="streaming-dot"></span>
-                      </div>
-                    </div>
+                    <div v-if="message.reasoning_content" class="panel-label">正式回答</div>
                     <div
                       v-if="assistantHasContent(message)"
                       class="markdown-body"
                       v-html="renderMarkdown(assistantDisplayContent(message))"
                     ></div>
-                    <div v-else-if="message.status === 'streaming'" class="streaming-placeholder" aria-hidden="true">
+                    <div
+                      v-if="message.status === 'streaming'"
+                      class="streaming-indicator"
+                      :class="{ 'streaming-indicator-empty': !assistantHasContent(message) }"
+                      aria-label="生成中"
+                    >
                       <span class="streaming-dot"></span>
                       <span class="streaming-dot"></span>
                       <span class="streaming-dot"></span>
@@ -267,8 +265,10 @@ const typewriterTimer = ref<number | null>(null)
 const typewriterPromptIndex = ref(0)
 const typewriterCharIndex = ref(0)
 const typewriterDeleting = ref(false)
+const autoScrollPinned = ref(true)
 let pendingScrollBehavior: ScrollBehavior = 'auto'
 let scrollScheduled = false
+const scrollBottomThreshold = 72
 
 const emptyStatePrompts = [
   '选择模型后，在这里直接输入你的问题。',
@@ -359,7 +359,7 @@ async function loadMessages(conversationID: string) {
 
   try {
     messages.value = await listConversationMessages(auth.accessToken, conversationID)
-    scrollMessagesToBottom()
+    scrollMessagesToBottom('auto', true)
   } catch (error) {
     messages.value = []
     ElMessage.error(toErrorMessage(error))
@@ -435,7 +435,7 @@ async function runCompletion(options: {
     created_at: createdAt
   })
   messages.value = nextMessages
-  scrollMessagesToBottom('smooth')
+  scrollMessagesToBottom('smooth', true)
 
   try {
     await streamChatCompletion(
@@ -453,6 +453,10 @@ async function runCompletion(options: {
             nextConversationID = event.conversation_id
             replaceMessageID(assistantMessageID, event.assistant_message_id)
             assistantMessageID = event.assistant_message_id
+            window.dispatchEvent(new Event('mrchat:conversations:refresh'))
+            if (nextConversationID && nextConversationID !== currentConversationId.value) {
+              void router.replace(`/chat/${nextConversationID}`)
+            }
             break
           case 'response.delta':
             appendMessageValue(assistantMessageID, 'content', event.delta.content ?? '')
@@ -477,11 +481,6 @@ async function runCompletion(options: {
       }
     )
 
-    window.dispatchEvent(new Event('mrchat:conversations:refresh'))
-    if (nextConversationID && nextConversationID !== currentConversationId.value) {
-      await router.push(`/chat/${nextConversationID}`)
-    }
-    await reloadAll()
   } catch (error) {
     if (isAbortError(error)) {
       patchMessage(assistantMessageID, { status: 'cancelled' })
@@ -494,8 +493,8 @@ async function runCompletion(options: {
     if (nextConversationID && nextConversationID !== currentConversationId.value) {
       await router.push(`/chat/${nextConversationID}`)
     }
-    await reloadAll()
   } finally {
+    window.dispatchEvent(new Event('mrchat:conversations:refresh'))
     streamAbortController.value = null
     sending.value = false
     focusComposer()
@@ -546,6 +545,15 @@ function appendMessageValue(messageID: string, field: 'content' | 'reasoning_con
   scrollMessagesToBottom()
 }
 
+function handleMessagesScroll() {
+  const element = messagesViewport.value
+  if (!element) {
+    return
+  }
+
+  autoScrollPinned.value = isScrolledNearBottom(element)
+}
+
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
 }
@@ -560,7 +568,13 @@ function toErrorMessage(error: unknown) {
   return '请求失败'
 }
 
-function scrollMessagesToBottom(behavior: ScrollBehavior = 'auto') {
+function scrollMessagesToBottom(behavior: ScrollBehavior = 'auto', force = false) {
+  if (force) {
+    autoScrollPinned.value = true
+  } else if (!autoScrollPinned.value) {
+    return
+  }
+
   pendingScrollBehavior = behavior === 'smooth' ? 'smooth' : pendingScrollBehavior
   if (scrollScheduled) {
     return
@@ -589,6 +603,11 @@ function scrollMessagesToBottom(behavior: ScrollBehavior = 'auto') {
       })
     })
   })
+}
+
+function isScrolledNearBottom(element: HTMLElement) {
+  const remainingDistance = element.scrollHeight - element.scrollTop - element.clientHeight
+  return remainingDistance <= scrollBottomThreshold
 }
 
 function resizeTextarea(element: HTMLTextAreaElement | null, maxHeight: number) {
@@ -1052,30 +1071,23 @@ function runEmptyStateTypewriterTick() {
   padding-top: 0.1rem;
 }
 
-.answer-panel-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-height: 1rem;
-}
-
 .panel-label {
   color: var(--text-secondary);
   font-size: 0.78rem;
   letter-spacing: 0.03em;
 }
 
-.streaming-indicator,
-.streaming-placeholder {
+.streaming-indicator {
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
   color: var(--text-secondary);
-}
-
-.streaming-placeholder {
   min-height: 1.4rem;
   padding: 0.1rem 0;
+}
+
+.streaming-indicator-empty {
+  padding-top: 0.2rem;
 }
 
 .streaming-dot {
