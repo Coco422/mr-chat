@@ -3,6 +3,7 @@
 .env.local
 .idea/
 .vscode/
+AGENTS.md
 
 bin/
 coverage.out
