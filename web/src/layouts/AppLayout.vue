@@ -11,34 +11,21 @@
               :title="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
               :aria-label="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path
-                  v-if="isSidebarCollapsed"
-                  d="m9 6 6 6-6 6"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-                <path
-                  v-else
-                  d="m15 6-6 6 6 6"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
+              <ElIcon class="header-icon">
+                <Expand v-if="isSidebarCollapsed" />
+                <Fold v-else />
+              </ElIcon>
             </button>
-            <button class="icon-btn theme-btn" @click="toggleTheme" title="切换主题" aria-label="切换主题">
-              <svg v-if="isDark()" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="12" cy="12" r="5" stroke-width="2"/><line x1="12" y1="1" x2="12" y2="3" stroke-width="2"/>
-                <line x1="12" y1="21" x2="12" y2="23" stroke-width="2"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" stroke-width="2"/>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" stroke-width="2"/><line x1="1" y1="12" x2="3" y2="12" stroke-width="2"/>
-                <line x1="21" y1="12" x2="23" y2="12" stroke-width="2"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-width="2"/>
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-width="2"/>
-              </svg>
-              <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke-width="2"/>
-              </svg>
+            <button
+              class="icon-btn theme-btn"
+              @click="toggleTheme"
+              :title="isDark() ? '切换浅色主题' : '切换深色主题'"
+              :aria-label="isDark() ? '切换浅色主题' : '切换深色主题'"
+            >
+              <ElIcon class="header-icon">
+                <Sunny v-if="isDark()" />
+                <Moon v-else />
+              </ElIcon>
             </button>
           </div>
         </div>
@@ -49,9 +36,9 @@
           :title="isSidebarCollapsed ? '新对话' : undefined"
           aria-label="新对话"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
+          <ElIcon class="button-icon">
+            <Plus />
+          </ElIcon>
           <span v-if="!isSidebarCollapsed">新对话</span>
         </button>
       </div>
@@ -73,29 +60,27 @@
 
       <nav class="nav-menu">
         <RouterLink to="/chat" class="nav-item" :title="isSidebarCollapsed ? '对话' : undefined">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-width="2"/>
-          </svg>
+          <ElIcon class="nav-icon">
+            <Message />
+          </ElIcon>
           <span class="nav-label">对话</span>
         </RouterLink>
         <RouterLink to="/usage" class="nav-item" :title="isSidebarCollapsed ? '用量' : undefined">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <line x1="12" y1="1" x2="12" y2="23" stroke-width="2"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-width="2"/>
-          </svg>
+          <ElIcon class="nav-icon">
+            <Histogram />
+          </ElIcon>
           <span class="nav-label">用量</span>
         </RouterLink>
         <RouterLink to="/settings/profile" class="nav-item" :title="isSidebarCollapsed ? '设置' : undefined">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <circle cx="12" cy="12" r="3" stroke-width="2"/><path d="M12 1v6m0 6v6" stroke-width="2"/>
-            <path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24m0-16.97-4.24 4.24m-5.66 5.66L4.93 19.07" stroke-width="2"/>
-          </svg>
+          <ElIcon class="nav-icon">
+            <Setting />
+          </ElIcon>
           <span class="nav-label">设置</span>
         </RouterLink>
         <RouterLink to="/admin/upstreams" class="nav-item" :title="isSidebarCollapsed ? '管理' : undefined">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke-width="2"/><line x1="9" y1="9" x2="15" y2="9" stroke-width="2"/>
-            <line x1="9" y1="15" x2="15" y2="15" stroke-width="2"/>
-          </svg>
+          <ElIcon class="nav-icon">
+            <Operation />
+          </ElIcon>
           <span class="nav-label">管理</span>
         </RouterLink>
       </nav>
@@ -110,10 +95,9 @@
             </div>
           </div>
           <button class="logout-btn" @click="handleSignOut" title="退出登录">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke-width="2"/><polyline points="16 17 21 12 16 7" stroke-width="2"/>
-              <line x1="21" y1="12" x2="9" y2="12" stroke-width="2"/>
-            </svg>
+            <ElIcon class="logout-icon">
+              <SwitchButton />
+            </ElIcon>
             <span v-if="!isSidebarCollapsed">退出</span>
           </button>
         </div>
@@ -127,6 +111,8 @@
 </template>
 
 <script setup lang="ts">
+import { ElIcon } from 'element-plus'
+import { Expand, Fold, Histogram, Message, Moon, Operation, Plus, Setting, Sunny, SwitchButton } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -258,6 +244,10 @@ function persistSidebarCollapsedState(collapsed: boolean) {
   height: 32px;
 }
 
+.header-icon {
+  font-size: 1rem;
+}
+
 .new-chat-btn {
   width: 100%;
   padding: 0.4rem 0.5rem;
@@ -273,6 +263,10 @@ function persistSidebarCollapsedState(collapsed: boolean) {
   justify-content: center;
   gap: 0.5rem;
   transition: background 0.2s ease, opacity 0.2s ease;
+}
+
+.button-icon {
+  font-size: 1rem;
 }
 
 .new-chat-btn:hover {
@@ -351,6 +345,11 @@ function persistSidebarCollapsedState(collapsed: boolean) {
   color: var(--text-secondary);
   font-size: 0.9rem;
   transition: background 0.2s ease, color 0.2s ease;
+}
+
+.nav-icon {
+  flex: none;
+  font-size: 1.05rem;
 }
 
 .nav-item:hover {
@@ -459,9 +458,9 @@ function persistSidebarCollapsedState(collapsed: boolean) {
   flex-shrink: 0;
 }
 
-.logout-btn svg {
-  width: 14px;
-  height: 14px;
+.logout-icon {
+  flex: none;
+  font-size: 0.95rem;
 }
 
 .logout-btn:hover {

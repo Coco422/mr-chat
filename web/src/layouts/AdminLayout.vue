@@ -13,22 +13,10 @@
             :title="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
             :aria-label="isSidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path
-                v-if="isSidebarCollapsed"
-                d="m9 6 6 6-6 6"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                v-else
-                d="m15 6-6 6 6 6"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+            <ElIcon class="header-icon">
+              <Expand v-if="isSidebarCollapsed" />
+              <Fold v-else />
+            </ElIcon>
           </button>
           <button
             class="icon-btn"
@@ -36,7 +24,10 @@
             :title="isDark() ? '切换浅色主题' : '切换深色主题'"
             :aria-label="isDark() ? '切换浅色主题' : '切换深色主题'"
           >
-            {{ isDark() ? '☀' : '☾' }}
+            <ElIcon class="header-icon">
+              <Sunny v-if="isDark()" />
+              <Moon v-else />
+            </ElIcon>
           </button>
         </div>
       </div>
@@ -50,7 +41,9 @@
           :class="{ active: isActive(item.to) }"
           :title="isSidebarCollapsed ? item.label : undefined"
         >
-          <span class="nav-dot" v-if="!isSidebarCollapsed"></span>
+          <ElIcon class="nav-icon">
+            <component :is="item.icon" />
+          </ElIcon>
           <span class="nav-label">{{ isSidebarCollapsed ? item.shortLabel : item.label }}</span>
         </RouterLink>
       </nav>
@@ -66,9 +59,15 @@
 
         <div class="footer-actions">
           <RouterLink to="/chat" class="action-link" :title="isSidebarCollapsed ? '返回聊天' : undefined">
+            <ElIcon class="action-icon">
+              <Message />
+            </ElIcon>
             {{ isSidebarCollapsed ? '聊天' : '返回聊天' }}
           </RouterLink>
           <button class="action-btn" @click="handleSignOut" :title="isSidebarCollapsed ? '退出登录' : undefined">
+            <ElIcon class="action-icon">
+              <SwitchButton />
+            </ElIcon>
             {{ isSidebarCollapsed ? '退出' : '退出登录' }}
           </button>
         </div>
@@ -82,6 +81,22 @@
 </template>
 
 <script setup lang="ts">
+import { ElIcon } from 'element-plus'
+import {
+  Avatar,
+  Connection,
+  Document,
+  Expand,
+  Files,
+  Fold,
+  Grid,
+  Message,
+  Moon,
+  Sunny,
+  SwitchButton,
+  Tickets,
+  User
+} from '@element-plus/icons-vue'
 import { onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 
@@ -96,13 +111,13 @@ const isSidebarCollapsed = ref(false)
 const ADMIN_SIDEBAR_COLLAPSED_STORAGE_KEY = 'mrchat:admin-sidebar:collapsed'
 
 const navItems = [
-  { to: '/admin/upstreams', label: '上游配置', shortLabel: '上游' },
-  { to: '/admin/channels', label: '渠道管理', shortLabel: '渠道' },
-  { to: '/admin/models', label: '模型管理', shortLabel: '模型' },
-  { to: '/admin/user-groups', label: '用户组', shortLabel: '分组' },
-  { to: '/admin/users', label: '用户管理', shortLabel: '用户' },
-  { to: '/admin/redeem-codes', label: '兑换码', shortLabel: '兑换' },
-  { to: '/admin/audit-logs', label: '审计日志', shortLabel: '日志' }
+  { to: '/admin/upstreams', label: '上游配置', shortLabel: '上游', icon: Connection },
+  { to: '/admin/channels', label: '渠道管理', shortLabel: '渠道', icon: Grid },
+  { to: '/admin/models', label: '模型管理', shortLabel: '模型', icon: Files },
+  { to: '/admin/user-groups', label: '用户组', shortLabel: '分组', icon: Avatar },
+  { to: '/admin/users', label: '用户管理', shortLabel: '用户', icon: User },
+  { to: '/admin/redeem-codes', label: '兑换码', shortLabel: '兑换', icon: Tickets },
+  { to: '/admin/audit-logs', label: '审计日志', shortLabel: '日志', icon: Document }
 ]
 
 onMounted(() => {
@@ -207,6 +222,10 @@ function persistSidebarCollapsedState(collapsed: boolean) {
   background: var(--surface-muted);
 }
 
+.header-icon {
+  font-size: 1rem;
+}
+
 .admin-nav {
   flex: 1;
   min-height: 0;
@@ -245,12 +264,9 @@ function persistSidebarCollapsedState(collapsed: boolean) {
   white-space: nowrap;
 }
 
-.nav-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--accent-primary);
-  opacity: 0.8;
+.nav-icon {
+  flex: none;
+  font-size: 1rem;
 }
 
 .sidebar-footer {
@@ -315,6 +331,10 @@ function persistSidebarCollapsedState(collapsed: boolean) {
   color: var(--text-primary);
   text-decoration: none;
   transition: background 0.2s ease, border-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
 }
 
 .action-btn {
@@ -325,6 +345,11 @@ function persistSidebarCollapsedState(collapsed: boolean) {
 .action-btn:hover {
   border-color: var(--accent-primary);
   background: var(--surface-muted);
+}
+
+.action-icon {
+  flex: none;
+  font-size: 0.95rem;
 }
 
 .admin-main {
@@ -355,8 +380,10 @@ function persistSidebarCollapsedState(collapsed: boolean) {
 }
 
 .admin-sidebar.collapsed .nav-item {
+  flex-direction: column;
   justify-content: center;
   padding: 0.7rem 0.45rem;
+  gap: 0.3rem;
 }
 
 .admin-sidebar.collapsed .nav-label {
@@ -410,8 +437,10 @@ function persistSidebarCollapsedState(collapsed: boolean) {
   }
 
   .admin-sidebar.collapsed .nav-item {
+    flex-direction: row;
     justify-content: flex-start;
     padding: 0.7rem 0.85rem;
+    gap: 0.65rem;
   }
 
   .admin-sidebar.collapsed .nav-label {
