@@ -29,6 +29,7 @@ type Service struct {
 	catalogRepo   *catalog.Repository
 	limitsService *limits.Service
 	client        *openAICompatibleClient
+	cooldowns     *upstreamCooldownTracker
 }
 
 type CompletionMessageInput struct {
@@ -84,6 +85,7 @@ func NewService(repo *Repository, accountRepo *account.Repository, catalogRepo *
 		catalogRepo:   catalogRepo,
 		limitsService: limitsService,
 		client:        &openAICompatibleClient{},
+		cooldowns:     newUpstreamCooldownTracker(),
 	}
 }
 
@@ -347,6 +349,16 @@ func (s *Service) completeWithRoutes(ctx context.Context, model *catalog.ModelWi
 			})
 			continue
 		}
+		if coolingDown, cooldownUntil, failureCount := s.cooldowns.isCoolingDown(upstream.ID); coolingDown {
+			attempts = append(attempts, map[string]any{
+				"upstream_id":    binding.UpstreamID,
+				"channel_id":     binding.ChannelID,
+				"result":         "cooldown",
+				"failure_count":  failureCount,
+				"cooldown_until": cooldownUntil.Format(time.RFC3339Nano),
+			})
+			continue
+		}
 
 		response, err := s.client.ChatCompletion(ctx, upstream, openAIChatCompletionRequest{
 			Model:    model.Model.ModelKey,
@@ -361,6 +373,7 @@ func (s *Service) completeWithRoutes(ctx context.Context, model *catalog.ModelWi
 			Metadata: metadata,
 		})
 		if err == nil {
+			s.cooldowns.recordSuccess(upstream.ID)
 			attempts = append(attempts, map[string]any{
 				"upstream_id": binding.UpstreamID,
 				"channel_id":  binding.ChannelID,
@@ -369,10 +382,19 @@ func (s *Service) completeWithRoutes(ctx context.Context, model *catalog.ModelWi
 			return response, binding, upstream, attempts, nil
 		}
 
+		failureCount, cooldownUntil := s.cooldowns.recordFailure(upstream)
 		attempts = append(attempts, map[string]any{
-			"upstream_id": binding.UpstreamID,
-			"channel_id":  binding.ChannelID,
-			"error":       err.Error(),
+			"upstream_id":   binding.UpstreamID,
+			"channel_id":    binding.ChannelID,
+			"result":        "failed",
+			"error":         err.Error(),
+			"failure_count": failureCount,
+			"cooldown_until": func() any {
+				if cooldownUntil.IsZero() {
+					return nil
+				}
+				return cooldownUntil.Format(time.RFC3339Nano)
+			}(),
 		})
 	}
 

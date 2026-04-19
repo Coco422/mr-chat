@@ -312,6 +312,16 @@ func (s *Service) openStreamWithRoutes(ctx context.Context, model *catalog.Model
 			})
 			continue
 		}
+		if coolingDown, cooldownUntil, failureCount := s.cooldowns.isCoolingDown(upstream.ID); coolingDown {
+			attempts = append(attempts, map[string]any{
+				"upstream_id":    binding.UpstreamID,
+				"channel_id":     binding.ChannelID,
+				"result":         "cooldown",
+				"failure_count":  failureCount,
+				"cooldown_until": cooldownUntil.Format(time.RFC3339Nano),
+			})
+			continue
+		}
 
 		stream, err := s.client.OpenChatCompletionStream(ctx, upstream, openAIChatCompletionRequest{
 			Model:    model.Model.ModelKey,
@@ -326,6 +336,7 @@ func (s *Service) openStreamWithRoutes(ctx context.Context, model *catalog.Model
 			Metadata: metadata,
 		})
 		if err == nil {
+			s.cooldowns.recordSuccess(upstream.ID)
 			attempts = append(attempts, map[string]any{
 				"upstream_id": binding.UpstreamID,
 				"channel_id":  binding.ChannelID,
@@ -334,10 +345,19 @@ func (s *Service) openStreamWithRoutes(ctx context.Context, model *catalog.Model
 			return stream, binding, upstream, attempts, nil
 		}
 
+		failureCount, cooldownUntil := s.cooldowns.recordFailure(upstream)
 		attempts = append(attempts, map[string]any{
-			"upstream_id": binding.UpstreamID,
-			"channel_id":  binding.ChannelID,
-			"error":       err.Error(),
+			"upstream_id":   binding.UpstreamID,
+			"channel_id":    binding.ChannelID,
+			"result":        "failed",
+			"error":         err.Error(),
+			"failure_count": failureCount,
+			"cooldown_until": func() any {
+				if cooldownUntil.IsZero() {
+					return nil
+				}
+				return cooldownUntil.Format(time.RFC3339Nano)
+			}(),
 		})
 	}
 
