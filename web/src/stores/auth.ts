@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { apiRequest } from '@/lib/api'
+import { apiRequest, registerAuthSessionStore } from '@/lib/api'
 import { refreshToken, signOut as signOutRequest } from '@/api/auth'
 
 const accessTokenKey = 'mrchat.access_token'
@@ -100,6 +100,8 @@ export const useAuthStore = defineStore('auth', () => {
     signOut
   }
 })
+
+registerAuthSessionStore(() => useAuthStore())
 
 function readStoredUser(): CurrentUser | AuthUser | null {
   const raw = localStorage.getItem(userKey)

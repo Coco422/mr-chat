@@ -81,7 +81,7 @@
 </template>
 
 <script setup lang="ts">
-import { ElIcon } from 'element-plus'
+import { ElIcon } from 'element-plus/es/components/icon/index'
 import {
   Avatar,
   Connection,

@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ElIcon } from 'element-plus'
+import { ElIcon } from 'element-plus/es/components/icon/index'
 import { Expand, Fold, Histogram, Message, Moon, Operation, Plus, Setting, Sunny, SwitchButton } from '@element-plus/icons-vue'
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { RouterLink, RouterView, useRouter, useRoute } from 'vue-router'

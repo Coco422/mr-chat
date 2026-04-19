@@ -2,11 +2,22 @@ import axios, { type Method, type InternalAxiosRequestConfig } from 'axios'
 
 import { reportPerfMetric } from '@/lib/performance'
 
+interface AuthSessionStore {
+  accessToken: string
+  refreshSession: () => Promise<boolean>
+  clearSession: () => void
+}
+
 let isRefreshing = false
 let failedQueue: Array<{
   resolve: (token: string) => void
   reject: (error: unknown) => void
 }> = []
+let resolveAuthSessionStore: (() => AuthSessionStore) | null = null
+
+export function registerAuthSessionStore(getStore: () => AuthSessionStore) {
+  resolveAuthSessionStore = getStore
+}
 
 function processQueue(error: unknown, token: string | null = null) {
   failedQueue.forEach((prom) => {
@@ -86,8 +97,10 @@ apiClient.interceptors.response.use(
 
       try {
         originalRequest._retry = true
-        const { useAuthStore } = await import('@/stores/auth')
-        const auth = useAuthStore()
+        const auth = resolveAuthSessionStore?.()
+        if (!auth) {
+          throw new Error('Auth session store is not registered')
+        }
         const success = await auth.refreshSession()
 
         if (success) {
@@ -95,6 +108,7 @@ apiClient.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${auth.accessToken}`
           return apiClient.request(originalRequest)
         } else {
+          auth.clearSession()
           processQueue(new Error('Token refresh failed'), null)
           if (typeof window !== 'undefined') {
             window.location.href = '/login'

@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
+import 'element-plus/es/components/icon/style/css'
+import 'element-plus/es/components/message/style/css'
 
 import App from './App.vue'
 import { setupPerformanceMonitor } from './lib/performance'
@@ -16,7 +16,6 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
-app.use(ElementPlus)
 
 setupPerformanceMonitor({
   // 默认开发环境开启，生产环境可以通过 VITE_ENABLE_PERF_MONITOR=true 手动开启。

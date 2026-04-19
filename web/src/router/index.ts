@@ -1,23 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import AdminLayout from '@/layouts/AdminLayout.vue'
-import AppLayout from '@/layouts/AppLayout.vue'
-import AuthLayout from '@/layouts/AuthLayout.vue'
-import AdminAuditLogsPage from '@/pages/admin/AdminAuditLogsPage.vue'
-import AdminChannelsPage from '@/pages/admin/AdminChannelsPage.vue'
-import AdminModelsPage from '@/pages/admin/AdminModelsPage.vue'
-import AdminRedeemCodesPage from '@/pages/admin/AdminRedeemCodesPage.vue'
-import AdminUserGroupsPage from '@/pages/admin/AdminUserGroupsPage.vue'
-import AdminUpstreamsPage from '@/pages/admin/AdminUpstreamsPage.vue'
-import AdminUsersPage from '@/pages/admin/AdminUsersPage.vue'
-import ChatPage from '@/pages/ChatPage.vue'
-import ForbiddenPage from '@/pages/ForbiddenPage.vue'
-import LoginPage from '@/pages/LoginPage.vue'
-import NotFoundPage from '@/pages/NotFoundPage.vue'
-import SettingsProfilePage from '@/pages/SettingsProfilePage.vue'
-import SettingsSecurityPage from '@/pages/SettingsSecurityPage.vue'
-import SignupPage from '@/pages/SignupPage.vue'
-import UsagePage from '@/pages/UsagePage.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -29,51 +11,51 @@ const router = createRouter({
     },
     {
       path: '/',
-      component: AuthLayout,
+      component: () => import('@/layouts/AuthLayout.vue'),
       meta: { guestOnly: true },
       children: [
         {
           path: 'login',
           name: 'login',
-          component: LoginPage
+          component: () => import('@/pages/LoginPage.vue')
         },
         {
           path: 'signup',
           name: 'signup',
-          component: SignupPage
+          component: () => import('@/pages/SignupPage.vue')
         }
       ]
     },
     {
       path: '/',
-      component: AppLayout,
+      component: () => import('@/layouts/AppLayout.vue'),
       meta: { requiresAuth: true },
       children: [
         {
           path: 'chat/:conversationId?',
           name: 'chat',
-          component: ChatPage
+          component: () => import('@/pages/ChatPage.vue')
         },
         {
           path: 'usage',
           name: 'usage',
-          component: UsagePage
+          component: () => import('@/pages/UsagePage.vue')
         },
         {
           path: 'settings/profile',
           name: 'settings-profile',
-          component: SettingsProfilePage
+          component: () => import('@/pages/SettingsProfilePage.vue')
         },
         {
           path: 'settings/security',
           name: 'settings-security',
-          component: SettingsSecurityPage
+          component: () => import('@/pages/SettingsSecurityPage.vue')
         }
       ]
     },
     {
       path: '/admin',
-      component: AdminLayout,
+      component: () => import('@/layouts/AdminLayout.vue'),
       meta: { requiresAuth: true, adminOnly: true },
       children: [
         {
@@ -83,49 +65,49 @@ const router = createRouter({
         {
           path: 'upstreams',
           name: 'admin-upstreams',
-          component: AdminUpstreamsPage
+          component: () => import('@/pages/admin/AdminUpstreamsPage.vue')
         },
         {
           path: 'models',
           name: 'admin-models',
-          component: AdminModelsPage
+          component: () => import('@/pages/admin/AdminModelsPage.vue')
         },
         {
           path: 'channels',
           name: 'admin-channels',
-          component: AdminChannelsPage
+          component: () => import('@/pages/admin/AdminChannelsPage.vue')
         },
         {
           path: 'user-groups',
           name: 'admin-user-groups',
-          component: AdminUserGroupsPage
+          component: () => import('@/pages/admin/AdminUserGroupsPage.vue')
         },
         {
           path: 'users',
           name: 'admin-users',
-          component: AdminUsersPage
+          component: () => import('@/pages/admin/AdminUsersPage.vue')
         },
         {
           path: 'redeem-codes',
           name: 'admin-redeem-codes',
-          component: AdminRedeemCodesPage
+          component: () => import('@/pages/admin/AdminRedeemCodesPage.vue')
         },
         {
           path: 'audit-logs',
           name: 'admin-audit-logs',
-          component: AdminAuditLogsPage
+          component: () => import('@/pages/admin/AdminAuditLogsPage.vue')
         }
       ]
     },
     {
       path: '/403',
       name: 'forbidden',
-      component: ForbiddenPage
+      component: () => import('@/pages/ForbiddenPage.vue')
     },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
-      component: NotFoundPage
+      component: () => import('@/pages/NotFoundPage.vue')
     }
   ]
 })
