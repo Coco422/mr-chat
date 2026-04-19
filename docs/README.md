@@ -19,6 +19,7 @@
 
 如果只想先看当前统一口径，建议先看：`docs/Requirements-Baseline-v0.1.md`。
 如果只想快速了解最新开发状态，可看：`docs/Implementation-Progress.md`。
+如果只想看当前从“能联调”推进到“可发布”的剩余交付顺序，可看：`docs/Delivery-Plan-v0.1-Remaining.md`。
 如果只想直接看当前可联调接口，可启动服务后访问：`/swagger/index.html`。
 如果只想看当前管理控制台后续怎么收敛，可看：`docs/Admin-Console-Refactor-Plan-v0.1.md`。
 如果只想快速对齐旧文档关系，可看：`docs/Current-Design-Summary.md`。
@@ -38,13 +39,14 @@ MVP 上线范围草案见：`docs/MVP-v0.1-Scope.md`。
 
 1. `docs/Requirements-Baseline-v0.1.md`
 2. `docs/Implementation-Progress.md`
-3. `docs/Page-and-Route-Spec-v0.1.md`
-4. `docs/API-Contract-v0.1.md`
-5. `docs/Data-Model-and-State-v0.1.md`
-6. `docs/Admin-Console-Refactor-Plan-v0.1.md`
-7. `docs/Development-Task-Breakdown-v0.1.md`
-8. `docs/Current-Design-Summary.md`
-9. `docs/Local-Development.md`
+3. `docs/Delivery-Plan-v0.1-Remaining.md`
+4. `docs/Page-and-Route-Spec-v0.1.md`
+5. `docs/API-Contract-v0.1.md`
+6. `docs/Data-Model-and-State-v0.1.md`
+7. `docs/Admin-Console-Refactor-Plan-v0.1.md`
+8. `docs/Development-Task-Breakdown-v0.1.md`
+9. `docs/Current-Design-Summary.md`
+10. `docs/Local-Development.md`
 
 ## 调研产出（本目录）
 

@@ -1,19 +1,20 @@
 # MrChat v0.1 开发任务拆解清单
 
 - 状态：执行中
-- 日期：2026-03-21
-- 更新摘要：已补 `user_groups` / `channels` / limit policies / user adjustments / `llm_request_logs` 设计与首版实现，并已接通首个基于数据库配置的 OpenAI 兼容上游、Swagger UI 与 `stream=true` SSE 主链路；2026-03-21 新增管理控制台重构计划，并落地上游模型发现、模型导入、admin 详情接口与 human-readable 关联返回
+- 日期：2026-04-19
+- 更新摘要：已补 `user_groups` / `channels` / limit policies / user adjustments / `llm_request_logs` 设计与首版实现，并已接通首个基于数据库配置的 OpenAI 兼容上游、Swagger UI 与 `stream=true` SSE 主链路；已落地管理控制台重构第一阶段（上游模型发现、模型导入、admin 详情接口与 human-readable 关联返回）以及新版 Chat 工作区 UI；当前剩余交付顺序见 `docs/Delivery-Plan-v0.1-Remaining.md`
 - 依赖文档：
   - `docs/Requirements-Baseline-v0.1.md`
   - `docs/Page-and-Route-Spec-v0.1.md`
   - `docs/API-Contract-v0.1.md`
   - `docs/Data-Model-and-State-v0.1.md`
   - `docs/Admin-Console-Refactor-Plan-v0.1.md`
+  - `docs/Delivery-Plan-v0.1-Remaining.md`
   - `docs/Implementation-Progress.md`
 
 ## 0. 当前实现快照
 
-截至 `2026-03-21`，当前任务推进情况可简化理解为：
+截至 `2026-04-19`，当前任务推进情况可简化理解为：
 
 - 已落地：
   - `INF-01`、`INF-02`、`INF-03`、`INF-04`、`INF-06`、`INF-07`
@@ -47,6 +48,7 @@
 - Chat 非流式主链路联调：`/api/v1/chat/completions -> upstream -> messages -> llm_request_logs`
 - Chat 流式主链路联调：`/api/v1/chat/completions(stream=true) -> SSE -> messages -> llm_request_logs`
 - Chat 侧模型列表、会话 CRUD、消息列表联调
+- Chat 工作区 UI 联调：侧栏会话导航、模型选择、`reasoning_content` 分区、复制 / 重试 / 编辑、流式状态反馈
 - Swagger UI 联调入口：`/swagger/index.html`
 
 当前已明确需要继续收敛的一条支线：
@@ -95,16 +97,17 @@
 - 在 `M2` 管理 API 稳定后，再推进后台页面
 - 在 `M3` SSE 契约稳定后，再推进流式细节和错误收敛
 
-### 3.3 最值得先锁定的阻塞项
+### 3.3 当前最值得先锁定的阻塞项
 
-- 数据表迁移方案
-- goose 迁移目录、命名规范与执行方式
-- GORM 模型与仓储分层约定
-- Redis 使用边界与故障降级策略
-- 鉴权方案与 token 刷新方式
-- SSE 事件格式
-- `quota_logs` 的账本语义
-- 模型到上游的路由绑定结构
+- `CHAT-BE-04`：多上游 failover、冷却与回切尚未闭环
+- `BILL-BE-01`：聊天返回中的 `billing` 仍为 `0`，`quota_logs` 账本尚未打通
+- `INF-08` + `AUTH-BE-03`：Redis 降级与登录风控仍未达到“故障不阻断核心链路”的标准
+- `BILL-BE-02` ~ `BILL-BE-05`：兑换码链路仍停留在 schema 已有、产品链路未闭环的状态
+- `INF-05` + `QA-*`：自动化测试和 CI 基线仍明显偏弱，发布可信度不足
+
+补充说明：
+
+- 当前剩余工作的推荐顺序、Sprint 切法与 issue 队列，不再从 `M0/M1` 初始化任务开始排，而是以 `docs/Delivery-Plan-v0.1-Remaining.md` 为准。
 
 ## 4. M0：工程基础与开发环境
 
@@ -227,87 +230,66 @@
 | `P1-SVC-02` | `/services` 与 `/services/:id` 页面 | Frontend | P1 | M | `P1-SVC-01` | 用户能看到并进入服务入口 |
 | `P1-SVC-03` | `/admin/service-entries` 管理页 | Frontend | P1 | M | `P1-SVC-01` | 管理员能配置 iframe/跳转服务 |
 
-## 12. 建议最先创建的 issue 列表
+## 12. 当前建议最先创建的 issue 列表
 
-如果要先起一批 issue，建议优先创建这 12 个：
+如果现在继续拆 issue，建议优先创建这 12 个：
 
-1. `INF-01` 后端工程骨架（Gin + GORM）
-2. `INF-02` 前端工程骨架
-3. `INF-04` 本地 PostgreSQL / Redis 启动方式
-4. `INF-07` goose 迁移规范与执行命令
-5. `INF-08` Redis 使用边界与降级策略
-6. `DB-01` 用户、认证与分组迁移
-7. `DB-02` 模型与上游迁移
-8. `AUTH-BE-01` 登录注册刷新
-9. `AUTH-BE-02` JWT 与角色守卫
-10. `AUTH-BE-03` 登录安全与风控日志
-11. `ADMIN-BE-01` 上游 CRUD
-12. `ADMIN-BE-02` 模型、可见组与路由绑定
+1. `CHAT-BE-04` 模型路由器的多上游 failover、冷却与回切
+2. `CHAT-BE-07` usage 回退口径接入正式结算
+3. `BILL-BE-01` 预扣、最终结算、退款闭环
+4. `INF-08` Redis key 命名空间、TTL 与降级策略落地
+5. `AUTH-BE-03` 登录失败限制、风控日志与基础限流
+6. `CHAT-BE-08` 路由日志、错误码和报表字段收敛
+7. `ADMIN-BE-08` 管理资源停用 / 删除前检查策略
+8. `BILL-BE-02` 兑换码批量生成 API
+9. `BILL-BE-03` 兑换码兑换 API 与事务幂等
+10. `BILL-BE-05` 后台兑换批次与兑换记录查询 API
+11. `ADMIN-FE-06` 兑换码管理页
+12. `INF-05` 最小 CI（Go + Web build/typecheck + smoke）
 
-## 13. 推荐第一轮 Sprint 切法
+## 13. 当前推荐 Sprint 切法
 
-### Sprint 1
+### Sprint A：把聊天和账本补成“可信链路”
 
-- `INF-01` ~ `INF-06`
-- `INF-07`
-- `INF-08`
-- `DB-01` ~ `DB-04`
-- `AUTH-BE-01` ~ `AUTH-BE-03`
-- `USER-BE-01`
-- `AUTH-FE-01`
-- `APP-FE-01`
-
-目标：
-
-- 能登录
-- 能拿到当前用户
-- 登录安全基线到位
-- goose 迁移链路可用
-- Redis 故障降级策略到位
-- 工程能跑、表能迁移
-
-### Sprint 2
-
-- `USER-BE-02`
-- `USER-BE-03`
-- `USER-FE-01`
-- `USER-FE-02`
-- `ADMIN-BE-01` ~ `ADMIN-BE-04`
-- `GROUP-BE-01`
-- `MODEL-BE-01`
-- `ADMIN-FE-01` ~ `ADMIN-FE-05`
-- `CHAT-BE-01`
-- `CHAT-BE-02`
-- `CHAT-FE-01`
-- `CHAT-FE-02`
-
-目标：
-
-- 用户设置页可用
-- 管理员可配置基础资源
-- 管理员可维护用户组与模型可见性
-- 用户能看到会话壳子与会话列表
-
-### Sprint 3
-
-- `CHAT-BE-03` ~ `CHAT-BE-08`
-- `CHAT-FE-03` ~ `CHAT-FE-09`
+- `CHAT-BE-04`
+- `CHAT-BE-07`
 - `BILL-BE-01`
+- `INF-08`
+- `AUTH-BE-03`
 
 目标：
 
-- 一次完整的非流式聊天已跑通，并继续推进 SSE
-- 路由、日志、结算进一步闭环
+- 上游故障能切换
+- `billing` 字段不再固定为零
+- Redis 故障不阻塞核心链路
+- 登录安全基线到位
 
-### Sprint 4
+### Sprint B：把运营和用户余额路径补成闭环
 
+- `CHAT-BE-08`
+- `ADMIN-BE-08`
 - `BILL-BE-02` ~ `BILL-BE-05`
+- `ADMIN-FE-06`
 - `USAGE-FE-01`
 - `USAGE-FE-02`
-- `ADMIN-FE-06`
-- `QA-01` ~ `QA-05`
+- `CHAT-FE-09`
 
 目标：
 
-- 额度、兑换码、账单全部闭环
+- 运营能发码、查码、查账
+- 用户能看用量、兑换额度、继续聊天
+- Chat 体验完成第一轮性能收口
+
+### Sprint C：把仓库补成“可发布状态”
+
+- `INF-05`
+- `QA-01` ~ `QA-05`
+- `OBS-01`
+- `OPS-01`
+- `DOC-01`
+
+目标：
+
+- 形成固定回归路径
+- 基础日志、部署文档、设计文档回填完成
 - 达到首发验收标准
