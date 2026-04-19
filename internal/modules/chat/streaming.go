@@ -27,6 +27,7 @@ type completionPreparedState struct {
 	firstUserMessage         string
 	combinedMessages         []openAIChatMessage
 	reservedCompletionTokens int
+	reservedQuota            int64
 }
 
 type streamTurnState struct {
@@ -49,29 +50,46 @@ func (s *Service) StreamCompletion(ctx context.Context, input CompletionInput, e
 		return err
 	}
 
+	if err := s.reserveQuota(ctx, input.UserID, input.RequestID, prepared.reservedQuota); err != nil {
+		return err
+	}
+
 	stream, routeBinding, upstream, attempts, err := s.openStreamWithRoutes(ctx, prepared.modelWithBindings, prepared.combinedMessages, prepared.reservedCompletionTokens, input.Metadata)
 	if err != nil {
-		_, _ = s.limitsService.CreateRequestLog(ctx, limits.RequestLogCreateInput{
-			RequestID:      input.RequestID,
-			UserID:         input.UserID,
-			UserGroupID:    prepared.user.UserGroupID,
-			ConversationID: sanitizeOptionalString(input.ConversationID),
-			ModelID:        prepared.modelID,
-			PromptTokens:   estimatePromptTokens(prepared.combinedMessages),
-			Status:         limits.RequestLogStatusFailed,
-			ErrorCode:      stringPtr("CHAT_UPSTREAM_UNAVAILABLE"),
-			StartedAt:      prepared.startedAt,
-			CompletedAt:    timePtr(time.Now().UTC()),
-			Metadata: map[string]any{
-				"attempts": attempts,
-			},
+		refundErr := s.accountRepo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if _, refundErr := s.settleReservedQuotaWithDB(ctx, tx, input.UserID, input.RequestID, prepared.reservedQuota, 0); refundErr != nil {
+				return refundErr
+			}
+			_, logErr := s.limitsService.CreateRequestLogWithDB(ctx, tx, limits.RequestLogCreateInput{
+				RequestID:      input.RequestID,
+				UserID:         input.UserID,
+				UserGroupID:    prepared.user.UserGroupID,
+				ConversationID: sanitizeOptionalString(input.ConversationID),
+				ModelID:        prepared.modelID,
+				PromptTokens:   estimatePromptTokens(prepared.combinedMessages),
+				BilledQuota:    0,
+				Status:         limits.RequestLogStatusFailed,
+				ErrorCode:      stringPtr("CHAT_UPSTREAM_UNAVAILABLE"),
+				StartedAt:      prepared.startedAt,
+				CompletedAt:    timePtr(time.Now().UTC()),
+				Metadata: map[string]any{
+					"attempts": attempts,
+				},
+			})
+			return logErr
 		})
+		if refundErr != nil {
+			return refundErr
+		}
 		return err
 	}
 	defer stream.Close()
 
 	turnState, err := s.createStreamingTurn(ctx, input, prepared, routeBinding, upstream, attempts)
 	if err != nil {
+		if refundErr := s.refundReservedQuota(ctx, input.UserID, input.RequestID, prepared.reservedQuota); refundErr != nil {
+			return refundErr
+		}
 		return err
 	}
 
@@ -162,7 +180,11 @@ func (s *Service) StreamCompletion(ctx context.Context, input CompletionInput, e
 		finishReason = "stop"
 	}
 
-	if err := s.completeStreamingTurn(ctx, turnState, finalUsage, contentBuilder.String(), reasoningBuilder.String(), finishReason); err != nil {
+	billing, err := s.completeStreamingTurn(ctx, turnState, prepared, finalUsage, contentBuilder.String(), reasoningBuilder.String(), finishReason)
+	if err != nil {
+		if refundErr := s.refundReservedQuota(ctx, input.UserID, input.RequestID, prepared.reservedQuota); refundErr != nil {
+			return refundErr
+		}
 		return err
 	}
 
@@ -177,9 +199,9 @@ func (s *Service) StreamCompletion(ctx context.Context, input CompletionInput, e
 			"total_tokens":      finalUsage.TotalTokens,
 		},
 		"billing": map[string]any{
-			"pre_deducted":  0,
-			"final_charged": 0,
-			"refunded":      0,
+			"pre_deducted":  billing.PreDeducted,
+			"final_charged": billing.FinalCharged,
+			"refunded":      billing.Refunded,
 		},
 		"finish_reason": finishReason,
 	})
@@ -264,6 +286,7 @@ func (s *Service) prepareCompletion(ctx context.Context, input CompletionInput) 
 		firstUserMessage:         firstUserMessage,
 		combinedMessages:         combinedMessages,
 		reservedCompletionTokens: reservedCompletionTokens,
+		reservedQuota:            estimatePromptTokens(combinedMessages) + int64(reservedCompletionTokens),
 	}, nil
 }
 
@@ -417,36 +440,27 @@ func (s *Service) createStreamingTurn(ctx context.Context, input CompletionInput
 	return state, nil
 }
 
-func (s *Service) completeStreamingTurn(ctx context.Context, state *streamTurnState, usage CompletionUsage, content, reasoningContent, finishReason string) error {
+func (s *Service) completeStreamingTurn(ctx context.Context, state *streamTurnState, prepared *completionPreparedState, usage CompletionUsage, content, reasoningContent, finishReason string) (CompletionBilling, error) {
 	now := time.Now().UTC()
 	status := limits.RequestLogStatusCompleted
+	var billing CompletionBilling
 
-	return s.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&Message{}).
-			Where("id = ?", state.assistant.ID).
-			Updates(map[string]any{
-				"content":           content,
-				"reasoning_content": emptyToNil(reasoningContent),
-				"status":            MessageStatusCompleted,
-				"finish_reason":     emptyToNil(finishReason),
-				"usage_json": map[string]any{
-					"prompt_tokens":     usage.PromptTokens,
-					"completion_tokens": usage.CompletionTokens,
-					"total_tokens":      usage.TotalTokens,
-				},
-				"updated_at": now,
-				"metadata_json": map[string]any{
-					"provider_model": state.providerModel,
-				},
-			}).Error; err != nil {
+	err := s.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := s.updateStreamingAssistantMessageWithDB(ctx, tx, state.assistant.ID, content, reasoningContent, MessageStatusCompleted, emptyToNil(finishReason), nil, usage, state.providerModel, now); err != nil {
 			return fmt.Errorf("complete assistant message: %w", err)
+		}
+
+		var err error
+		billing, err = s.settleReservedQuotaWithDB(ctx, tx, state.assistant.UserID, stringOrEmpty(state.assistant.RequestID), prepared.reservedQuota, usage.TotalTokens)
+		if err != nil {
+			return err
 		}
 
 		if _, err := s.limitsService.UpdateRequestLogByRequestIDWithDB(ctx, tx, stringOrEmpty(state.assistant.RequestID), limits.RequestLogUpdateInput{
 			PromptTokens:     int64Ptr(usage.PromptTokens),
 			CompletionTokens: int64Ptr(usage.CompletionTokens),
 			TotalTokens:      int64Ptr(usage.TotalTokens),
-			BilledQuota:      int64Ptr(0),
+			BilledQuota:      int64Ptr(billing.FinalCharged),
 			Status:           &status,
 			CompletedAt:      timePtr(now),
 			Metadata: map[string]any{
@@ -460,6 +474,11 @@ func (s *Service) completeStreamingTurn(ctx context.Context, state *streamTurnSt
 
 		return nil
 	})
+	if err != nil {
+		return CompletionBilling{}, err
+	}
+
+	return billing, nil
 }
 
 func (s *Service) failStreamingTurn(ctx context.Context, state *streamTurnState, prepared *completionPreparedState, errorCode string, requestStatus limits.RequestLogStatus, messageStatus MessageStatus, content, reasoningContent string) error {
@@ -467,30 +486,20 @@ func (s *Service) failStreamingTurn(ctx context.Context, state *streamTurnState,
 	usage := normalizeCompletionUsage(openAIUsage{}, prepared.combinedMessages, content, reasoningContent)
 
 	return s.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&Message{}).
-			Where("id = ?", state.assistant.ID).
-			Updates(map[string]any{
-				"content":           content,
-				"reasoning_content": emptyToNil(reasoningContent),
-				"status":            messageStatus,
-				"error_code":        emptyToNil(errorCode),
-				"usage_json": map[string]any{
-					"prompt_tokens":     usage.PromptTokens,
-					"completion_tokens": usage.CompletionTokens,
-					"total_tokens":      usage.TotalTokens,
-				},
-				"updated_at": now,
-				"metadata_json": map[string]any{
-					"provider_model": state.providerModel,
-				},
-			}).Error; err != nil {
+		if err := s.updateStreamingAssistantMessageWithDB(ctx, tx, state.assistant.ID, content, reasoningContent, messageStatus, nil, emptyToNil(errorCode), usage, state.providerModel, now); err != nil {
 			return fmt.Errorf("update failed stream message: %w", err)
+		}
+
+		billing, err := s.settleReservedQuotaWithDB(ctx, tx, state.assistant.UserID, stringOrEmpty(state.assistant.RequestID), prepared.reservedQuota, usage.TotalTokens)
+		if err != nil {
+			return err
 		}
 
 		if _, err := s.limitsService.UpdateRequestLogByRequestIDWithDB(ctx, tx, stringOrEmpty(state.assistant.RequestID), limits.RequestLogUpdateInput{
 			PromptTokens:     int64Ptr(usage.PromptTokens),
 			CompletionTokens: int64Ptr(usage.CompletionTokens),
 			TotalTokens:      int64Ptr(usage.TotalTokens),
+			BilledQuota:      int64Ptr(billing.FinalCharged),
 			Status:           &requestStatus,
 			ErrorCode:        &errorCode,
 			CompletedAt:      timePtr(now),
@@ -505,6 +514,38 @@ func (s *Service) failStreamingTurn(ctx context.Context, state *streamTurnState,
 
 		return nil
 	})
+}
+
+func (s *Service) updateStreamingAssistantMessageWithDB(ctx context.Context, tx *gorm.DB, messageID, content, reasoningContent string, status MessageStatus, finishReason, errorCode *string, usage CompletionUsage, providerModel string, updatedAt time.Time) error {
+	if tx == nil {
+		tx = s.repo.db
+	}
+
+	var message Message
+	if err := tx.WithContext(ctx).First(&message, "id = ?", messageID).Error; err != nil {
+		return err
+	}
+
+	message.Content = content
+	message.ReasoningContent = emptyToNil(reasoningContent)
+	message.Status = status
+	message.FinishReason = finishReason
+	message.ErrorCode = errorCode
+	message.Usage = map[string]any{
+		"prompt_tokens":     usage.PromptTokens,
+		"completion_tokens": usage.CompletionTokens,
+		"total_tokens":      usage.TotalTokens,
+	}
+	message.Metadata = map[string]any{
+		"provider_model": providerModel,
+	}
+	message.UpdatedAt = updatedAt
+
+	if err := tx.WithContext(ctx).Save(&message).Error; err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func int64Ptr(value int64) *int64 {

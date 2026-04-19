@@ -117,7 +117,6 @@ func (s *Service) ListMessages(ctx context.Context, userID, conversationID strin
 }
 
 func (s *Service) CreateCompletion(ctx context.Context, input CompletionInput) (*CompletionResult, error) {
-	startedAt := time.Now().UTC()
 	if strings.TrimSpace(input.RequestID) == "" {
 		input.RequestID = uuid.NewString()
 	}
@@ -126,99 +125,69 @@ func (s *Service) CreateCompletion(ctx context.Context, input CompletionInput) (
 		return nil, ErrStreamNotSupported
 	}
 
-	messages, firstUserMessage, err := normalizeCompletionMessages(input.Messages)
+	prepared, err := s.prepareCompletion(ctx, input)
 	if err != nil {
 		return nil, err
 	}
 
-	user, err := s.accountRepo.GetUserByID(ctx, input.UserID)
-	if err != nil {
+	if err := s.reserveQuota(ctx, input.UserID, input.RequestID, prepared.reservedQuota); err != nil {
 		return nil, err
 	}
 
-	conversationID := sanitizeOptionalString(input.ConversationID)
-	var conversation *Conversation
-	if conversationID != nil {
-		conversation, err = s.repo.getConversation(ctx, input.UserID, *conversationID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	modelID := sanitizeOptionalString(input.ModelID)
-	if modelID == nil && conversation != nil {
-		modelID = sanitizeOptionalString(conversation.ModelID)
-	}
-	if modelID == nil {
-		return nil, ErrInvalidCompletionRequest
-	}
-
-	modelWithBindings, err := s.catalogRepo.GetModelByID(ctx, *modelID)
+	upstreamResponse, routeBinding, upstream, attempts, err := s.completeWithRoutes(
+		ctx,
+		prepared.modelWithBindings,
+		prepared.combinedMessages,
+		prepared.reservedCompletionTokens,
+		input.Metadata,
+	)
 	if err != nil {
-		return nil, ErrModelNotAvailable
-	}
-	if modelWithBindings.Model.Status != catalog.ModelStatusActive || !canUserAccessModel(user, modelWithBindings.Model.VisibleUserGroupIDs) {
-		return nil, ErrModelNotAvailable
-	}
-
-	history, err := s.loadConversationHistory(ctx, input.UserID, conversation)
-	if err != nil {
-		return nil, err
-	}
-	combinedMessages := append(history, messages...)
-
-	reservedCompletionTokens := resolveReservedCompletionTokens(input.MaxTokens, modelWithBindings.Model.MaxOutputTokens)
-	limitResult, err := s.limitsService.CheckUserModelLimit(ctx, limits.LimitCheckInput{
-		UserID:                   input.UserID,
-		ModelID:                  modelID,
-		PromptTokens:             estimatePromptTokens(combinedMessages),
-		ReservedCompletionTokens: int64(reservedCompletionTokens),
-		Now:                      startedAt,
-	})
-	if err != nil {
-		if errors.Is(err, limits.ErrLimitExceeded) {
-			_ = s.limitsService.RecordRejectedRequest(ctx, input.RequestID, limitResult.Report, "CHAT_LIMIT_EXCEEDED", map[string]any{
-				"conversation_id": conversationID,
-				"model_id":        modelID,
-				"reason":          "user_model_limit",
+		refundErr := s.accountRepo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if _, refundErr := s.settleReservedQuotaWithDB(ctx, tx, input.UserID, input.RequestID, prepared.reservedQuota, 0); refundErr != nil {
+				return refundErr
+			}
+			_, logErr := s.limitsService.CreateRequestLogWithDB(ctx, tx, limits.RequestLogCreateInput{
+				RequestID:      input.RequestID,
+				UserID:         input.UserID,
+				UserGroupID:    prepared.user.UserGroupID,
+				ConversationID: sanitizeOptionalString(input.ConversationID),
+				ModelID:        prepared.modelID,
+				PromptTokens:   estimatePromptTokens(prepared.combinedMessages),
+				BilledQuota:    0,
+				Status:         limits.RequestLogStatusFailed,
+				ErrorCode:      stringPtr("CHAT_UPSTREAM_UNAVAILABLE"),
+				StartedAt:      prepared.startedAt,
+				CompletedAt:    timePtr(time.Now().UTC()),
+				Metadata: map[string]any{
+					"attempts": attempts,
+				},
 			})
+			return logErr
+		})
+		if refundErr != nil {
+			return nil, refundErr
 		}
 		return nil, err
 	}
 
-	upstreamResponse, routeBinding, upstream, attempts, err := s.completeWithRoutes(ctx, modelWithBindings, combinedMessages, reservedCompletionTokens, input.Metadata)
-	if err != nil {
-		_, _ = s.limitsService.CreateRequestLog(ctx, limits.RequestLogCreateInput{
-			RequestID:      input.RequestID,
-			UserID:         input.UserID,
-			UserGroupID:    user.UserGroupID,
-			ConversationID: conversationID,
-			ModelID:        modelID,
-			PromptTokens:   estimatePromptTokens(combinedMessages),
-			Status:         limits.RequestLogStatusFailed,
-			ErrorCode:      stringPtr("CHAT_UPSTREAM_UNAVAILABLE"),
-			StartedAt:      startedAt,
-			CompletedAt:    timePtr(time.Now().UTC()),
-			Metadata: map[string]any{
-				"attempts": attempts,
-			},
-		})
-		return nil, err
-	}
-
-	usage := normalizeCompletionUsage(upstreamResponse.Usage, combinedMessages, upstreamResponse.assistantContent(), upstreamResponse.reasoningContent())
+	usage := normalizeCompletionUsage(
+		upstreamResponse.Usage,
+		prepared.combinedMessages,
+		upstreamResponse.assistantContent(),
+		upstreamResponse.reasoningContent(),
+	)
 
 	var result *CompletionResult
 	err = s.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		activeConversation := conversation
+		activeConversation := prepared.conversation
 		now := time.Now().UTC()
 		if activeConversation == nil {
-			title := buildConversationTitle(firstUserMessage)
+			title := buildConversationTitle(prepared.firstUserMessage)
 			item := &Conversation{
 				ID:           uuid.NewString(),
 				UserID:       input.UserID,
 				Title:        title,
-				ModelID:      modelID,
+				ModelID:      prepared.modelID,
 				Status:       ConversationStatusActive,
 				MessageCount: 0,
 				Metadata:     map[string]any{},
@@ -231,11 +200,11 @@ func (s *Service) CreateCompletion(ctx context.Context, input CompletionInput) (
 			activeConversation = item
 		}
 
-		if activeConversation.ModelID == nil || (modelID != nil && *activeConversation.ModelID != *modelID) {
-			activeConversation.ModelID = modelID
+		if activeConversation.ModelID == nil || (prepared.modelID != nil && *activeConversation.ModelID != *prepared.modelID) {
+			activeConversation.ModelID = prepared.modelID
 		}
 
-		createdMessages, err := createRequestMessages(ctx, tx, activeConversation.ID, input.UserID, modelID, input.RequestID, messages)
+		createdMessages, err := createRequestMessages(ctx, tx, activeConversation.ID, input.UserID, prepared.modelID, input.RequestID, prepared.normalizedMessages)
 		if err != nil {
 			return err
 		}
@@ -243,7 +212,7 @@ func (s *Service) CreateCompletion(ctx context.Context, input CompletionInput) (
 		assistantMessage, err := createAssistantMessage(ctx, tx, assistantMessageInput{
 			ConversationID:   activeConversation.ID,
 			UserID:           input.UserID,
-			ModelID:          modelID,
+			ModelID:          prepared.modelID,
 			UpstreamID:       &upstream.ID,
 			RequestID:        input.RequestID,
 			Content:          upstreamResponse.assistantContent(),
@@ -270,20 +239,25 @@ func (s *Service) CreateCompletion(ctx context.Context, input CompletionInput) (
 			return fmt.Errorf("update conversation after completion: %w", err)
 		}
 
+		billing, err := s.settleReservedQuotaWithDB(ctx, tx, input.UserID, input.RequestID, prepared.reservedQuota, usage.TotalTokens)
+		if err != nil {
+			return err
+		}
+
 		if _, err := s.limitsService.CreateRequestLogWithDB(ctx, tx, limits.RequestLogCreateInput{
 			RequestID:        input.RequestID,
 			UserID:           input.UserID,
-			UserGroupID:      user.UserGroupID,
+			UserGroupID:      prepared.user.UserGroupID,
 			ConversationID:   &activeConversation.ID,
 			MessageID:        &assistantMessage.ID,
-			ModelID:          modelID,
+			ModelID:          prepared.modelID,
 			ChannelID:        routeBinding.ChannelID,
 			PromptTokens:     usage.PromptTokens,
 			CompletionTokens: usage.CompletionTokens,
 			TotalTokens:      usage.TotalTokens,
-			BilledQuota:      0,
+			BilledQuota:      billing.FinalCharged,
 			Status:           limits.RequestLogStatusCompleted,
-			StartedAt:        startedAt,
+			StartedAt:        prepared.startedAt,
 			CompletedAt:      timePtr(now),
 			Metadata: map[string]any{
 				"attempts":       attempts,
@@ -311,15 +285,14 @@ func (s *Service) CreateCompletion(ctx context.Context, input CompletionInput) (
 				CompletionTokens: usage.CompletionTokens,
 				TotalTokens:      usage.TotalTokens,
 			},
-			Billing: CompletionBilling{
-				PreDeducted:  0,
-				FinalCharged: 0,
-				Refunded:     0,
-			},
+			Billing: billing,
 		}
 		return nil
 	})
 	if err != nil {
+		if refundErr := s.refundReservedQuota(ctx, input.UserID, input.RequestID, prepared.reservedQuota); refundErr != nil {
+			return nil, refundErr
+		}
 		return nil, err
 	}
 

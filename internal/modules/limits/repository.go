@@ -326,50 +326,39 @@ func (r *Repository) UpdateRequestLogByRequestIDWithDB(ctx context.Context, db *
 		return nil, fmt.Errorf("request_id is required")
 	}
 
-	updates := map[string]any{}
-	if input.PromptTokens != nil {
-		updates["prompt_tokens"] = *input.PromptTokens
-	}
-	if input.CompletionTokens != nil {
-		updates["completion_tokens"] = *input.CompletionTokens
-	}
-	if input.TotalTokens != nil {
-		updates["total_tokens"] = *input.TotalTokens
-	}
-	if input.BilledQuota != nil {
-		updates["billed_quota"] = *input.BilledQuota
-	}
-	if input.Status != nil {
-		updates["status"] = *input.Status
-	}
-	if input.ErrorCode != nil {
-		updates["error_code"] = sanitizeOptionalString(input.ErrorCode)
-	}
-	if input.CompletedAt != nil {
-		updates["completed_at"] = input.CompletedAt.UTC()
-	}
-	if input.Metadata != nil {
-		updates["metadata_json"] = nonNilMap(input.Metadata)
-	}
-
-	if len(updates) == 0 {
-		var item LLMRequestLog
-		if err := db.WithContext(ctx).Where("request_id = ?", requestID).First(&item).Error; err != nil {
-			return nil, fmt.Errorf("get llm request log: %w", err)
-		}
-		return &item, nil
-	}
-
-	if err := db.WithContext(ctx).
-		Model(&LLMRequestLog{}).
-		Where("request_id = ?", requestID).
-		Updates(updates).Error; err != nil {
-		return nil, fmt.Errorf("update llm request log: %w", err)
-	}
-
 	var item LLMRequestLog
 	if err := db.WithContext(ctx).Where("request_id = ?", requestID).First(&item).Error; err != nil {
-		return nil, fmt.Errorf("get llm request log after update: %w", err)
+		return nil, fmt.Errorf("get llm request log: %w", err)
+	}
+
+	if input.PromptTokens != nil {
+		item.PromptTokens = *input.PromptTokens
+	}
+	if input.CompletionTokens != nil {
+		item.CompletionTokens = *input.CompletionTokens
+	}
+	if input.TotalTokens != nil {
+		item.TotalTokens = *input.TotalTokens
+	}
+	if input.BilledQuota != nil {
+		item.BilledQuota = *input.BilledQuota
+	}
+	if input.Status != nil {
+		item.Status = *input.Status
+	}
+	if input.ErrorCode != nil {
+		item.ErrorCode = sanitizeOptionalString(input.ErrorCode)
+	}
+	if input.CompletedAt != nil {
+		completedAt := input.CompletedAt.UTC()
+		item.CompletedAt = &completedAt
+	}
+	if input.Metadata != nil {
+		item.Metadata = nonNilMap(input.Metadata)
+	}
+
+	if err := db.WithContext(ctx).Save(&item).Error; err != nil {
+		return nil, fmt.Errorf("update llm request log: %w", err)
 	}
 
 	return &item, nil

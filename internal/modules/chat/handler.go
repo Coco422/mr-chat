@@ -307,6 +307,8 @@ func (h *Handler) handleError(c *gin.Context, err error) {
 		httpx.Failure(c, http.StatusBadGateway, "CHAT_UPSTREAM_UNAVAILABLE", "No upstream is currently available for this model", nil)
 	case errors.Is(err, limits.ErrLimitExceeded):
 		httpx.Failure(c, http.StatusTooManyRequests, "CHAT_LIMIT_EXCEEDED", "User model limit exceeded", nil)
+	case errors.Is(err, ErrInsufficientQuota):
+		httpx.Failure(c, http.StatusPaymentRequired, "BILLING_INSUFFICIENT_QUOTA", "Insufficient quota", nil)
 	default:
 		httpx.Failure(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", "Internal server error", nil)
 	}
